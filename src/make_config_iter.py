@@ -5,7 +5,7 @@ import json
 
 params = {}
 # number of particles of type A
-params['n_a_part'] = 1800
+params['n_a_part'] = 2402
 # number of particles of type B
 params['n_b_part'] = 0
 # fixes the length of the waiting time axis
@@ -19,7 +19,7 @@ params['l_box'] = 60
 # size of the histogram bin for g(r) (?)
 params['r_bin'] = 0.002
 # prefix for the location of datafiles
-params['prefix_file'] = '../../Simple_lj_T1/CONF/slj_'
+params['prefix_file'] = '/home/davide/OneDrive/POLITO/Magistrale/Internship/W2_MD/ljs/lj_'
 # output file for waitingtimes
 params['wt_file'] = 'list_wt.dat'
 # cutoff in the lj potential
@@ -35,10 +35,10 @@ params['target_file'] = 'gs_target.dat'
 # target precision
 params['target_precision'] = 0
 params['output_file'] = 'gr_final.dat'
-params['max_iter'] = 50
+params['max_iter'] = 15
 params['method'] = 'in'
 params['Temperature'] = 1
-params['init_pot'] = 'lj_rep'
+params['init_pot'] = 'pot_15.dat'
 params['delta_reg'] = 0.05
 # Decide if begins from an old config, or from scratch
 # Needs to store it as a string, json does not like booleans
