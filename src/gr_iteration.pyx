@@ -71,6 +71,7 @@ cpdef double[:] get_pot(str name, int pot_length, double r_bin, double x_min, do
 		for i in range(0, pot_length):
 			pot_list[i] -= offset
 		return pot_list
+	return pot_list
 
 cpdef double[:] init_x(int pot_length, double r_bin, double x_min, double T):
 	""" Choose the force/r to initiate the iteration loop. 

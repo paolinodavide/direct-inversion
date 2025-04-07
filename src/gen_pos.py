@@ -15,7 +15,11 @@ cor_wt = []
 with open(wt_file, 'r') as f:
     wt_data = f.read()
 wt_lines = wt_data.split("\n")
-for line in wt_lines:
+
+# EDITTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+for i, line in enumerate(wt_lines): #
+    if i > 126: # add a parameter to the config file
+        break #
     if ((line.split() != []) and (line.split()[0][0] != '#')):
         cor_wt.append(int(line.split()[0]))
 dict_pos = {}

@@ -17,24 +17,25 @@ else:
     save = False
 
 ################### Figure settings ######################################
-# good latex font
-from matplotlib import rc
-rc('text', usetex = True)
-#style
-plt.style.use('figure')
-# put figure cleverly
-plt.rcParams.update({'figure.autolayout': True})
+# # good latex font
+# from matplotlib import rc
+# rc('text', usetex = True)
+# #style
+# plt.style.use('figure')
+# # put figure cleverly
+# plt.rcParams.update({'figure.autolayout': True})
 
 ################# Program ################################################
+input_filename = './rdfs_0.002/g_r_h_avg.dat'
 
 # Create a json file with the g(r) target
 dict_tgt = {}
-with open('gr_h_0p002.dat', 'r') as f:
+with open(input_filename, 'r') as f:
     list_data = f.read()
 list_lines = list_data.split("\n")
 for line in list_lines:
     if (line.split() != []) and (line.split()[0] != '#'):
-        dict_tgt[line.split("\t")[0]] = line.split("\t")[1]
+        dict_tgt[line.split()[0]] = line.split()[1]
 json.dump(dict_tgt, open('histo.json', 'w+'))
 
 with open('histo.json') as f:
@@ -65,6 +66,8 @@ for i in range(0, len(positions)):
 g_test1 = csaps(pos_red1, g_red1, xi1, smooth = 0.999999)
 g_test2 = csaps(pos_red2, g_red2, xi2, smooth = 0.99995)
 
+###### Redefine the g(r) function in the range 0.8-4.0
+
 pos_red3 = []
 g_red3 = []
 for i in range(0, len(pos_red1)):
@@ -79,6 +82,8 @@ for i in range(0, len(pos_red1)):
                 j = k
                 print(j)
         g_red3.append(0.5*float(g_test1[i]) + 0.5*float(g_test2[j]))
+
+
 for i in range(0, len(pos_red2)):
     if float(pos_red2[i]) > 1.024:
         pos_red3.append(float(pos_red2[i]))
@@ -88,10 +93,12 @@ for i in range(0, len(pos_red2)):
 pos = []
 for i in range(0, 5001):
     pos.append(i*0.002)
+
+
 dict_test = {}
 for i in range(0, len(pos)):
-    if pos[i]>= 0.80 and pos[i] <= 4.0:
-        dict_test[pos[i]] = g_red3[i - 400]
+    if pos[i]>= 0.80 and pos[i] < 4.0: ## modified
+        dict_test[pos[i]] = g_red3[i-400] #-400 ???????
     elif pos[i] < 0.8:
         dict_test[pos[i]] = 0
     else:

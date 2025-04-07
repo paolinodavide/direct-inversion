@@ -19,7 +19,7 @@ params['l_box'] = 60
 # size of the histogram bin for g(r) (?)
 params['r_bin'] = 0.002
 # prefix for the location of datafiles
-params['prefix_file'] = '/home/davide/OneDrive/POLITO/Magistrale/Internship/W2_MD/ljs/lj_'
+params['prefix_file'] = '/home/davide/OneDrive/POLITO/Magistrale/Internship/W4_MD/ljs/lj_'
 # output file for waitingtimes
 params['wt_file'] = 'list_wt.dat'
 # cutoff in the lj potential
@@ -28,17 +28,17 @@ params['x_cut'] = 2.5
 params['qdim_max'] = 5000
 params['qdim'] = 60000
 # minimum length for the potential
-params['x_min'] = 0.878
-params['x_low'] = 0.934
+params['x_min'] = 0.820#0.8106402025559762
+params['x_low'] = 0.875# 0.934
 # file for target g(r)
 params['target_file'] = 'gs_target.dat'
 # target precision
 params['target_precision'] = 0
 params['output_file'] = 'gr_final.dat'
-params['max_iter'] = 15
+params['max_iter'] = 25
 params['method'] = 'in'
-params['Temperature'] = 1
-params['init_pot'] = 'pot_15.dat'
+params['Temperature'] = 3
+params['init_pot'] = 'pot_25'
 params['delta_reg'] = 0.05
 # Decide if begins from an old config, or from scratch
 # Needs to store it as a string, json does not like booleans

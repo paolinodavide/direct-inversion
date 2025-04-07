@@ -105,7 +105,7 @@ if (INIT):
     x_tmp = get_x(u_tmp, x_low, r_bin, pot_length)
 else:
     # Initialize u on previous data
-    data_u = np.genfromtxt('pot_test.dat', delimiter = '\t', usecols = (0,1,2))
+    data_u = np.genfromtxt(f'{str(init_pot)}.dat', delimiter = '\t', usecols = (0,1,2))
     for i in range(0, pot_length):
         u_tmp[i] = data_u[i][1]
         x_tmp[i] = data_u[i][2]
