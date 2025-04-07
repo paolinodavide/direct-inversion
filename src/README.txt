@@ -26,4 +26,4 @@ $ python3 grinter_parallel.py
 
 6) Parse the result files.
 
-$ python3 convert_json.py
+$ bash Gen_res.sh
