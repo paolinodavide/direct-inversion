@@ -9,6 +9,7 @@ The code is organized into modular Python and Cython scripts, and is intended to
 ---
 
 ## 📁 Folder Structure
+```
 project-root/
 ├── src/ # Core scripts and modules
 │ ├── *.py / *.pyx # Python & Cython code
@@ -19,7 +20,7 @@ project-root/
 ├── Results/ # Automatically generated results
 ├── config_iter_/ # Input configuration folders
 └── README.md # This file
-
+```
 
 ---
 
