@@ -14,5 +14,6 @@ python3 convert_json.py err.json
 
 python3 plot_results.py gr
 python3 plot_results.py pot
+python3 plot_results.py err
 
 cd ..
