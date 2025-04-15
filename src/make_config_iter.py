@@ -19,7 +19,7 @@ params['l_box'] = 60
 # size of the histogram bin for g(r) (?)
 params['r_bin'] = 0.002
 # prefix for the location of datafiles
-params['prefix_file'] = '/home/davide/OneDrive/POLITO/Magistrale/Internship/W4_MD/ljs/lj_'
+params['prefix_file'] = '../ljs/lj_'
 # output file for waitingtimes
 params['wt_file'] = 'list_wt.dat'
 # cutoff in the lj potential
