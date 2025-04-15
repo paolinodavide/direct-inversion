@@ -5,11 +5,11 @@ import json
 
 params = {}
 # number of particles of type A
-params['n_a_part'] = 2402
+params['n_a_part'] = 1297
 # number of particles of type B
 params['n_b_part'] = 0
 # fixes the length of the waiting time axis
-params['n_totstep'] = 800000
+params['n_totstep'] = 500000
 # initial length of list of waiting times
 params['n_correl_wt'] = 1000
 # log time axis or linear axis (False -> linear)
@@ -19,7 +19,7 @@ params['l_box'] = 60
 # size of the histogram bin for g(r) (?)
 params['r_bin'] = 0.002
 # prefix for the location of datafiles
-params['prefix_file'] = '../ljs/lj_'
+params['prefix_file'] = '../configs/lj_'
 # output file for waitingtimes
 params['wt_file'] = 'list_wt.dat'
 # cutoff in the lj potential
@@ -28,7 +28,7 @@ params['x_cut'] = 2.5
 params['qdim_max'] = 5000
 params['qdim'] = 60000
 # minimum length for the potential
-params['x_min'] = 0.820#0.8106402025559762
+params['x_min'] = 0.82#9434105881836
 params['x_low'] = 0.875# 0.934
 # file for target g(r)
 params['target_file'] = 'gs_target.dat'
@@ -38,11 +38,11 @@ params['output_file'] = 'gr_final.dat'
 params['max_iter'] = 25
 params['method'] = 'in'
 params['Temperature'] = 3
-params['init_pot'] = 'pot_25'
+params['init_pot'] = 'lj_full'
 params['delta_reg'] = 0.05
 # Decide if begins from an old config, or from scratch
 # Needs to store it as a string, json does not like booleans
-params['INIT'] = False
+params['INIT'] = True
 params['GR'] = 'HISTO'
 
 # Generate configuration file

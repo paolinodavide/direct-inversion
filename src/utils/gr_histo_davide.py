@@ -1,0 +1,127 @@
+import os
+import numpy as np
+from multiprocessing import Pool
+from tqdm import tqdm
+import glob
+from scipy.spatial.distance import pdist
+import matplotlib.pyplot as plt
+
+def find_lj_config_files(directory='./configs/', pattern='lj_*.dat'):
+    """Find all LJ configuration files in the directory"""
+    files = glob.glob(os.path.join(directory, pattern))
+    # Extract numbers from filenames and sort numerically
+    files.sort(key=lambda x: int(x.split('_')[-1].split('.')[0]))
+    return files
+
+def rdf_from_file(filename):
+    """Process a single file to calculate RDF"""
+    try:
+        with open(filename, 'r') as f:
+            # Read first line to get box size
+            first_line = f.readline().strip()
+            box_size = float(first_line.split('l_box = ')[1])
+
+            # Read remaining lines for coordinates
+            data = []
+            for line in f:
+                if line.strip():  # skip empty lines
+                    x, y = map(float, line.strip().split())
+                    data.append([x, y])
+        positions = np.array(data)
+
+        # Calculate RDF
+        r, g_r = calculate_rdf_scipy(positions, box_size, dr, r_max)
+
+        # Save results
+        file_num = os.path.basename(filename).split('_')[1].split('.')[0]
+        output_folder = './rdfs/'
+        os.makedirs(output_folder, exist_ok=True)
+        
+        output_filename = f'{output_folder}/g_r_lj_{file_num}.dat'
+        np.savetxt(output_filename, np.column_stack((r, g_r)), 
+                  header='# r g(r)')
+
+        return g_r, r
+
+    except Exception as e:
+        print(f"Error processing {filename}: {str(e)}")
+        return None
+
+def calculate_rdf_scipy(positions, box_size, dr=0.02, r_max=10, dim=2):
+    """Optimized RDF calculation"""
+    N = len(positions)
+    rho = N / (box_size ** 2)
+    bins = np.arange(0, r_max + dr, dr)
+    r = bins[:-1] + dr/2
+    g_r = np.zeros_like(r)
+
+    # Vectorized distance calculation with PBC
+    dist_nd_sq = np.zeros(N * (N - 1) // 2)
+    for d in range(dim):
+        pos_1d = positions[:, d][:, np.newaxis]
+        dist_1d = pdist(pos_1d)
+        dist_1d[dist_1d > box_size * 0.5] -= box_size
+        dist_nd_sq += dist_1d ** 2
+    
+    dist_nd = np.sqrt(dist_nd_sq)
+    valid_dist = dist_nd[dist_nd < r_max]
+    
+    # Vectorized bin counting
+    bin_indices = (valid_dist // dr).astype(int)
+    unique_bins, counts = np.unique(bin_indices, return_counts=True)
+    g_r[unique_bins] = counts * 2  # count i-j and j-i
+
+    # Normalization
+    ring_areas = np.pi * (bins[1:]**2 - bins[:-1]**2)
+    g_r /= (N * rho * ring_areas)
+
+    return r, g_r
+
+def main():
+    global dr, r_max
+    dr = 0.002
+    r_max = 10
+    
+    # Find all files to process
+    files = find_lj_config_files()
+    if not files:
+        print("No LJ config files found in ./configs/")
+        return
+    
+    print(f"Found {len(files)} files to process")
+    
+    # Process in parallel with progress bar
+    with Pool() as pool:
+        results = list(tqdm(pool.imap(rdf_from_file, files), 
+                      total=len(files),
+                      desc="Processing RDFs"))
+    
+    # Combine results (if needed)
+    valid_results = [res for res in results if res is not None]
+    if valid_results:
+        g_total = np.mean([g for g, _ in valid_results], axis=0)
+        r = valid_results[0][1]
+        
+        # Save combined RDF
+        np.savetxt('./rdfs/g_r_h_average.dat', 
+                  np.column_stack((r, g_total)),
+                  header='# r g(r)')
+        print("All files processed successfully")
+    else:
+        print("No valid results were generated")
+    
+
+
+    plt.figure(figsize=(8, 6))
+    plt.scatter(r, g_total, s=10, color='blue', label='g(r)')
+    plt.xlabel('r', fontsize=14)
+    plt.ylabel('g(r)', fontsize=14)
+    plt.title('Radial Distribution Function', fontsize=16)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend(fontsize=12)
+    plt.tight_layout()
+    plt.savefig('./rdfs/g_r_total_plot.png', dpi=300)
+    plt.show()
+
+if __name__ == '__main__':
+    main()
