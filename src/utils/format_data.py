@@ -4,6 +4,7 @@
 # Call this file from a .sh script to generate the appropriate directory
 
 import sys
+import os
 
 # Give the name of the simulation file as an argument
 try:
@@ -70,7 +71,9 @@ while (index < len(List_column)):
             index += 3
         elif (List_column[index][1] == 'ATOMS'):
             copy = True
-            save_results = open(filename, "w")
+            if not os.path.exists("./configs"):
+                os.makedirs("./configs")
+            save_results = open(f"./configs/{filename}", "w")
             save_results.write('# x \t y \t l_box = ' + str(l_box) + '\n')
             index += 1
         else:
