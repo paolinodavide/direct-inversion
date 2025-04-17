@@ -5,7 +5,7 @@ from scipy.interpolate import make_smoothing_spline
 from scipy.signal import savgol_filter
 
 # Constants - named in UPPER_CASE for better identification
-INPUT_FILENAME = '../rdfs/g_r_h_avg.dat'
+INPUT_FILENAME = 'rdfs/g_r_h_avg.dat'
 OUTPUT_HISTO_JSON = './src/histo.json'
 OUTPUT_SMOOTH_JSON = './src/smooth.json'
 

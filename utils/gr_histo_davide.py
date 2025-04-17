@@ -103,7 +103,7 @@ def main():
         r = valid_results[0][1]
         
         # Save combined RDF
-        np.savetxt('./rdfs/g_r_h_average.dat', 
+        np.savetxt('./rdfs/g_r_h_avg.dat', 
                   np.column_stack((r, g_total)),
                   header='# r g(r)')
         print("All files processed successfully")
