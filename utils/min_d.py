@@ -9,7 +9,7 @@ from scipy.spatial.distance import pdist
 import matplotlib.pyplot as plt
 import os
 
-def find_lj_config_files(directory='../configs/', pattern='lj_*.dat'):
+def find_lj_config_files(directory='./configs/', pattern='lj_*.dat'):
     """Find all LJ configuration files in the directory"""
     files = glob.glob(os.path.join(directory, pattern))
     # Extract numbers from filenames and sort numerically

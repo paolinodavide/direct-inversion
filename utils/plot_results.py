@@ -27,6 +27,7 @@ if filetype != 'err':
             plt.title(f"{str(filetype)} vs Positions")
             plt.ylabel(f"{str(filetype)}")
 
+
         except OSError:
             print(f"File {file} not found. Skipping.")
 
@@ -57,4 +58,6 @@ if filetype == 'lj':
 plt.xlabel("Position")
 plt.grid(linestyle='--')
 plt.legend()
+plt.savefig(f"{filetype}.png", dpi=300, bbox_inches='tight')
+plt.tight_layout()
 plt.show()
