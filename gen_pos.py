@@ -9,6 +9,7 @@ wt_file = params['wt_file']
 #wt_file = '../../Morse_T1/CONF_Mo/gr_wt.dat'
 prefix_file = params['prefix_file']
 n_part = params['n_a_part'] + params['n_b_part']
+max_nb_config = params['n_max_wt']
 
 # Initialise waiting times
 cor_wt = []
@@ -18,12 +19,13 @@ wt_lines = wt_data.split("\n")
 
 # EDITTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
 for i, line in enumerate(wt_lines): #
-    if i > 126: # add a parameter to the config file
+    if i > max_nb_config + 1: 
         break #
     if ((line.split() != []) and (line.split()[0][0] != '#')):
         cor_wt.append(int(line.split()[0]))
 dict_pos = {}
 n_correl = len(cor_wt)
+
 #array_wt = np.zeros(n_correl)
 List_pos = np.zeros((n_part, 2))
 for i in range(0, n_correl):
