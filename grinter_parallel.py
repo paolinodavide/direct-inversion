@@ -55,8 +55,7 @@ for j in range(0, pot_length):
 
 dict_pot['target'] = []
 for j in range(0, len(u_tmp)):
-    dict_pot['target'].append([x_low + j*r_bin, u_tmp[j], x_tmp[j]])
-
+    dict_pot['target'].append([x_low + j*r_bin, u_tmp[j], x_tmp[j]]) 
 # Initialize g(r)
 prefactor = 2.*pi*n_part*rho*n_correl_wt/4.
 g_tgt = np.zeros(qdim)

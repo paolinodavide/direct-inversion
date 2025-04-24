@@ -57,6 +57,6 @@ if filetype == 'lj':
 # Add labels, legend, and title
 plt.xlabel("Position")
 plt.grid(linestyle='--')
-plt.savefig(f"{filetype}.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{filetype}.svg", format="svg")
 plt.legend()
 plt.show()
