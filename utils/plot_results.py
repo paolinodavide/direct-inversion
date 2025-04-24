@@ -9,6 +9,12 @@ except IndexError:
     print("Enter the name of the file to parse")
 
 
+isForce = False
+column_index = 1
+plot_type = filetype
+if filetype == 'forces':
+    filetype = 'pot'
+    column_index = 2
 
 if filetype != 'err':
     # Automatically find all files matching the pattern
@@ -20,16 +26,17 @@ if filetype != 'err':
 
             # Assume the first column is positions and the second column is potentials
             positions = data[:, 0]
-            potentials = data[:, 1]
+            y_data = data[:, column_index]
 
             # Plot the data
-            plt.plot(positions, potentials, label=str(file))
-            plt.title(f"{str(filetype)} vs Positions")
+            plt.plot(positions, y_data, label=str(file))
+            plt.title(f"{str(plot_type)} vs Positions")
             plt.ylabel(f"{str(filetype)}")
 
 
         except OSError:
             print(f"File {file} not found. Skipping.")
+
 
 if filetype == 'err':
     try:
