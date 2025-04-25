@@ -51,6 +51,8 @@ def calculate_rdf_scipy(positions, box_size, dr=0.02, r_max=10, dim=2):
     """Optimized RDF calculation"""
     N = len(positions)
     rho = N / (box_size ** 2)
+    if r_max > box_size / 2:
+        r_max = box_size / 2
     bins = np.arange(0, r_max + dr, dr)
     r = bins[:-1] + dr/2
     g_r = np.zeros_like(r)
