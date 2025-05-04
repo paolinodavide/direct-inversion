@@ -41,13 +41,26 @@ def plot_error(filetype):
     """Plot error data from a specific file."""
     data = load_data(f"{filetype}.dat")
     if data is not None:
-        values = data[:, 1]
-        plt.scatter(range(len(values)), values, label=f"{filetype}.dat")
-        plt.title(f"{filetype} vs Line Index")
+        first_column = data[:, 0]
+        last_column = data[:, -1]
+
+        plt.subplot(1, 2, 1)
+        plt.scatter(range(len(first_column)), first_column, label="First Column")
+        plt.title(f"{filetype} - First Column vs Line Index")
         plt.xlabel("Line Index")
-        plt.ylabel(filetype)
+        plt.ylabel("First Column")
         plt.grid(linestyle='--')
         plt.legend()
+
+        plt.subplot(1, 2, 2)
+        plt.scatter(range(len(last_column)), last_column, label="Last Column")
+        plt.title(f"{filetype} - Last Column vs Line Index")
+        plt.xlabel("Line Index")
+        plt.ylabel("Last Column")
+        plt.grid(linestyle='--')
+        plt.legend()
+
+        plt.tight_layout()
         plt.savefig(f"{filetype}.svg", format="svg")
         plt.show()
 

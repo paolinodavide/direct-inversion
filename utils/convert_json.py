@@ -26,12 +26,12 @@ if (suffix == 'err'):
     data_file = suffix + ".dat"
     save_data = open(data_file, 'w')
     save_data.write('# Delta(g)^2 \t Delta(u)^2 \t delta_tgt \t delta_pot' + \
-            '\t alpha_pot \n')
+            '\t alpha_pot \t Delta(iter)^2 \n')
     for i in range(len(dict_res['gr'])):
         save_data.write(str(dict_res['gr'][i]) + "\t" + str(dict_res['pot'][i]) + \
                 "\t" + str(dict_res['delta_tgt'][i]) + "\t" + \
                 str(dict_res['delta_pot'][i]) + "\t" + str(dict_res['alpha_pot'][i]) + \
-                "\n")
+                "\t" + str(dict_res['iteration'][i]) + "\n")
     save_data.close()
 
 for key in list_keys:

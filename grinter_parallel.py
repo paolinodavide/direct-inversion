@@ -105,7 +105,7 @@ def main():
 
         err_gr = get_error(g_target, g_current, x_low, x_cut, r_bin)
         err_pot = get_error(u_target, u_current, x_low, x_cut, r_bin)
-        err_iteration = get_error(g_target, g_previous, x_low, x_cut, r_bin) if iteration > 1 else 0
+        err_iteration = get_error(g_current, g_previous, x_low, x_cut, r_bin) if iteration > 1 else 0
         
         dict_err['iteration'] = dict_err.get('iteration', [])
         dict_err['iteration'].append(err_iteration)
