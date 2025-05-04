@@ -1,0 +1,11 @@
+# Ignore the build directory
+build/
+
+# Ignore all JSON files
+*.json
+
+# Ignore all compiled shared object files
+*.so
+*.o
+*.html
+*.c
