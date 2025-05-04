@@ -17,4 +17,6 @@ python3 plot_results.py pot
 python3 plot_results.py forces
 python3 plot_results.py err
 
+python3 plot_results.py final
+
 cd ..
