@@ -14,6 +14,4 @@ python3 convert_json.py err.json
 
 python3 plot_results.py all
 
-python3 plot_results.py final
-
 cd ..
