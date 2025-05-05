@@ -99,15 +99,22 @@ def main():
         return
 
     column_index = 1
+    plot_type = filetype
     if filetype == 'forces':
         filetype = 'pot'
         column_index = 2
 
-    if filetype not in ['err', 'final']:
-        process_files(filetype, column_index, filetype, filetype)
+    if filetype not in ['err', 'final', 'all']:
+        process_files(filetype, column_index, plot_type, plot_type)
     elif filetype == 'err':
         plot_error(filetype)
     elif filetype == 'final':
+        plot_final()
+    elif filetype == 'all':
+        process_files('gr', 1, 'g(r)', 'g(r)')
+        process_files('pot', 1, 'Potential', 'Potential')
+        process_files('pot', 2, 'Forces', 'Force')
+        plot_error('err')
         plot_final()
 
 
