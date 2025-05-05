@@ -1,8 +1,8 @@
 import json
 import numpy as np
-from gr_pair import pair
-from gr_iteration import iteration
-from gr_pair_parallel import pairPar
+import gr_pair as pair
+import gr_iteration as it
+import gr_pair_parallel as pairPar
 import time 
 
 def load_config():
@@ -15,8 +15,8 @@ def load_positions():
 
 def initialize_potential(params, pot_length, r_bin, x_low):
     if params['INIT']:
-        u = iteration.get_pot(params['init_pot'], pot_length, r_bin, x_low, params['Temperature'])
-        x = iteration.get_x(u, x_low, r_bin, pot_length)
+        u = it.get_pot(params['init_pot'], pot_length, r_bin, x_low, params['Temperature'])
+        x = it.get_x(u, x_low, r_bin, pot_length)
     else:
         data = np.genfromtxt(f"{params['init_pot']}.dat", delimiter='\t', usecols=(0, 1, 2))
         u = data[:, 1]
@@ -60,8 +60,8 @@ def main():
     g_target = g_target_full[binlow:bincut]
     delta_tgt = g_target_full[binlow]
 
-    u_target = iteration.get_pot('lj_full', pot_length, r_bin, x_low, params['Temperature'])
-    x_target = iteration.init_x(pot_length, r_bin, x_low, params['Temperature'])
+    u_target = it.get_pot('lj_full', pot_length, r_bin, x_low, params['Temperature'])
+    x_target = it.init_x(pot_length, r_bin, x_low, params['Temperature'])
 
     dict_gr = {'target': [[j * r_bin, g_target_full[j]] for j in range(qdim)]}
     dict_pot = {'target': [[x_low + j*r_bin, u_target[j], x_target[j]] for j in range(pot_length)]}
@@ -133,8 +133,8 @@ def main():
         alpha = (1. - delta_tgt) / (1 - delta_pot)
         dict_err['alpha_pot'].append(alpha)
 
-        u_current = iteration.update_pot(pot_length, delta_reg, T, g_target_full, gr_res, u_current, r_bin, x_low, alpha)
-        x_current = iteration.get_x(u_current, x_low, r_bin, pot_length)
+        u_current = it.update_pot(pot_length, delta_reg, T, g_target_full, gr_res, u_current, r_bin, x_low, alpha)
+        x_current = it.get_x(u_current, x_low, r_bin, pot_length)
 
         dict_pot[str(iteration)] = [[x_low + j*r_bin, u_current[j], x_current[j]] for j in range(pot_length)]
 
