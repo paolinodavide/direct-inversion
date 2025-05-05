@@ -3,6 +3,7 @@ import numpy as np
 from gr_pair import *
 from gr_iteration import *
 from gr_pair_parallel import *
+import time 
 
 def load_config():
     with open("config.json") as f:
@@ -80,9 +81,11 @@ def main():
     best_index = 1
     iteration = 1
 
+    startTime = time.time()
     while True:
         if iteration > max_iter:
             print("Error: Target precision not reached.")
+
             break
         if iteration > 1:
             g_previous = g_current
@@ -141,6 +144,8 @@ def main():
 
         iteration += 1
 
+    endTime = time.time()
+    print(f"Total time: {(endTime - startTime) / 60:.2f} minutes")
     print("Best index:", best_index)
     dict_gr['best'] = best_index
 
