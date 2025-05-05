@@ -1,8 +1,8 @@
 import json
 import numpy as np
-from gr_pair import *
-from gr_iteration import *
-from gr_pair_parallel import *
+from gr_pair import pair
+from gr_iteration import iteration
+from gr_pair_parallel import pairPar
 import time 
 
 def load_config():
@@ -15,8 +15,8 @@ def load_positions():
 
 def initialize_potential(params, pot_length, r_bin, x_low):
     if params['INIT']:
-        u = get_pot(params['init_pot'], pot_length, r_bin, x_low, params['Temperature'])
-        x = get_x(u, x_low, r_bin, pot_length)
+        u = iteration.get_pot(params['init_pot'], pot_length, r_bin, x_low, params['Temperature'])
+        x = iteration.get_x(u, x_low, r_bin, pot_length)
     else:
         data = np.genfromtxt(f"{params['init_pot']}.dat", delimiter='\t', usecols=(0, 1, 2))
         u = data[:, 1]
@@ -39,8 +39,8 @@ def build_dict(entries):
     return [[x, y, z] for x, y, z in zip(*entries)]
 
 def compute_error_metrics(g_target, g_current, u_target, u_current, x_low, x_cut, r_bin):
-    e_gr = get_error(g_target, g_current, x_low, x_cut, r_bin)
-    e_pot = get_error(u_target, u_current, x_low, x_cut, r_bin)
+    e_gr = pair.get_error(g_target, g_current, x_low, x_cut, r_bin)
+    e_pot = pair.get_error(u_target, u_current, x_low, x_cut, r_bin)
     return e_gr, e_pot
 
 def main():
@@ -60,8 +60,8 @@ def main():
     g_target = g_target_full[binlow:bincut]
     delta_tgt = g_target_full[binlow]
 
-    u_target = get_pot('lj_full', pot_length, r_bin, x_low, params['Temperature'])
-    x_target = init_x(pot_length, r_bin, x_low, params['Temperature'])
+    u_target = iteration.get_pot('lj_full', pot_length, r_bin, x_low, params['Temperature'])
+    x_target = iteration.init_x(pot_length, r_bin, x_low, params['Temperature'])
 
     dict_gr = {'target': [[j * r_bin, g_target_full[j]] for j in range(qdim)]}
     dict_pot = {'target': [[x_low + j*r_bin, u_target[j], x_target[j]] for j in range(pot_length)]}
@@ -92,7 +92,7 @@ def main():
 
         print(f"Iteration #{iteration} ...")
 
-        gr_raw = gen_grBorgis_cpp(n_part, qdim, l_box, r_bin, 10, x_cut, binmin, binlow, x_current)
+        gr_raw = pairPar.gen_grBorgis_cpp(n_part, qdim, l_box, r_bin, 10, x_cut, binmin, binlow, x_current)
         delta_pot = 1 - gr_raw[binlow] / prefactor
 
         gr_res = np.zeros(qdim)
@@ -106,9 +106,9 @@ def main():
 
         g_current = gr_res[binlow:bincut]
 
-        err_gr = get_error(g_target, g_current, x_low, x_cut, r_bin)
-        err_pot = get_error(u_target, u_current, x_low, x_cut, r_bin)
-        err_iteration = get_error(g_current, g_previous, x_low, x_cut, r_bin) if iteration > 1 else 0
+        err_gr = pair.get_error(g_target, g_current, x_low, x_cut, r_bin)
+        err_pot = pair.get_error(u_target, u_current, x_low, x_cut, r_bin)
+        err_iteration = pair.get_error(g_current, g_previous, x_low, x_cut, r_bin) if iteration > 1 else 0
         
         dict_err['iteration'] = dict_err.get('iteration', [])
         dict_err['iteration'].append(err_iteration)
@@ -133,8 +133,8 @@ def main():
         alpha = (1. - delta_tgt) / (1 - delta_pot)
         dict_err['alpha_pot'].append(alpha)
 
-        u_current = update_pot(pot_length, delta_reg, T, g_target_full, gr_res, u_current, r_bin, x_low, alpha)
-        x_current = get_x(u_current, x_low, r_bin, pot_length)
+        u_current = iteration.update_pot(pot_length, delta_reg, T, g_target_full, gr_res, u_current, r_bin, x_low, alpha)
+        x_current = iteration.get_x(u_current, x_low, r_bin, pot_length)
 
         dict_pot[str(iteration)] = [[x_low + j*r_bin, u_current[j], x_current[j]] for j in range(pot_length)]
 
