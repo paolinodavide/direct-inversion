@@ -89,7 +89,7 @@ def grBorgis_notNorm(particle_positions, box_length, min_radius, r_bin, num_bins
                 if d_ij_squared == 0.0:  # Skip self-interaction
                     continue
                 d_ij = np.sqrt(d_ij_squared)
-                binIdx_ij = int(d_ij / r_bin)
+                binIdx_ij = int(d_ij - min_radius/ r_bin)
 
                 if d_ij <= r_cut and binIdx_ij > binlow:
                     alpha = d_ij / r_bin - binIdx_ij
