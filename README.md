@@ -8,7 +8,7 @@ This project implements Iterative Boltzmann Inversion (IBI) and related coarse-g
 
 ## ⚙️ Usage Guide
 
-> 🧵 All steps assume execution from within the `project-root/` directory.
+> 🧵 All steps assume execution from within the `forceIBI/` directory.
 
 ### 1. Compile Cython Extensions
 
@@ -24,29 +24,16 @@ Edit the file `forceIBI/borgis.py` and set the number of cores (recommended: 8):
 NUM_THREADS = 8  # Example
 ```
 
-### 3. Convert Input Configurations
+### 3. Prepare Configuration Module
 
-All `.dat` configuration files in `configs/` must be converted to `.npy` format before running:
-
-```bash
-python3 forceIBI/utils/convert_npy.py
-```
-
-The converted files will be stored in the `configs_npy/` directory.
-
-### 4. Prepare Configuration Module
-
+Make sure that the configurations file are correctly compiled in `.npy` format.
 Edit your configuration file and generate the module:
 
 ```bash
 python3 make_config_iter.py
 ```
 
-### 5. Select Snapshot Subset
-
-Edit `list_wt.dat` to define which frames or snapshots to include.
-
-### 6. Run Main Computation
+### 4. Run Main Computation
 
 Execute the main routine:
 
@@ -90,4 +77,6 @@ project-root/
 
 - Do **not** place configuration folders inside subdirectories — they must be located directly in the project root.
 - The `gen_pos.py` script is now deprecated and no longer required.
+- the `format_data.py` script now also converts the files from `.dat` to `.npy`. 
 - The `Results/` folder will be created automatically if it doesn't exist.
+- Target RDFs and waiting time list should be saved in `project-root` directory.

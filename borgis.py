@@ -1,13 +1,14 @@
 import numpy as np
-from scipy.spatial.distance import pdist, squareform
 import matplotlib.pyplot as plt
 import os
-from tqdm import tqdm
 from multiprocessing import Pool
 from functools import partial
 import glob
-from numba import njit, prange
+from numba import njit
 import gr_iteration as it
+
+global NUM_THREADS
+NUM_THREADS = 8
 
 def initialize_potential(pot_length, r_bin, x_low):
     if True:
@@ -169,7 +170,7 @@ def gBorgis_parallel(box_length,force_div_r, x_low, max_radius, bin_width, x_cut
     _ = cmpt_borgis_from_file(config_files[0], box_length, min_radius, bin_width, num_bins, x_current, x_low, x_cut, method)
 
     # Parallel computation using multiprocessing
-    with Pool(8) as pool:
+    with Pool(NUM_THREADS) as pool:
         borgis_results = list(
             pool.imap(partial(cmpt_borgis_from_file,
                     box_length=box_length,

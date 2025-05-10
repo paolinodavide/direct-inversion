@@ -5,6 +5,7 @@
 
 import sys
 import os
+import numpy as np
 
 # Give the name of the simulation file as an argument
 try:
@@ -82,3 +83,19 @@ while (index < len(List_column)):
         index += 1
 
 save_times.close()
+
+# Convert the .dat files to .npy files
+# Create the output directory if it doesn't exist
+if not os.path.exists("./configs_npy"):
+    os.makedirs("./configs_npy")
+
+# Iterate through all .dat files in the ./configs directory and process them
+for file_name in filter(lambda f: f.endswith(".dat"), os.listdir("./configs")):
+    file_path = os.path.join("./configs", file_name)
+    
+    # Load data directly into a numpy array, skipping header lines
+    data_array = np.loadtxt(file_path, comments="#", usecols=(0, 1))
+    
+    # Save the numpy array to a .npy file
+    npy_file_path = os.path.join("./configs_npy", file_name.replace(".dat", ".npy"))
+    np.save(npy_file_path, data_array)
