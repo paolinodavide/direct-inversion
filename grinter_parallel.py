@@ -2,7 +2,7 @@ import json
 import numpy as np
 import gr_pair as pair
 import gr_iteration as it
-import gr_pair_parallel as pairPar
+import borgis as grNb
 import time 
 
 def load_config():
@@ -32,8 +32,11 @@ def load_target_gr(params, qdim):
         g_target[:len(data)] = data[:, 1]
     return g_target
 
-def compute_prefactor(n_part, rho, n_correl_wt):
-    return 2. * np.pi * n_part * rho * n_correl_wt / 4.
+def compute_prefactor(n_part, rho, n_correl_wt, temperature=1.0):
+    """ No need anymore to divide by n_correl_wt, grNb returns the average 
+    The 4 is needed as the LJ potential in it.get_pot is divided by 4.
+    Temperature is incuded in the potential."""
+    return 2 * np.pi * rho * n_part / 4
 
 def build_dict(entries):
     return [[x, y, z] for x, y, z in zip(*entries)]
@@ -92,17 +95,23 @@ def main():
 
         print(f"Iteration #{iteration} ...")
 
-        gr_raw = pairPar.gen_grBorgis_cpp(n_part, qdim, l_box, r_bin, 10, x_cut, binmin, binlow, x_current)
-        delta_pot = 1 - gr_raw[binlow] / prefactor
+
+        x_current = np.asarray(x_current, dtype=np.float64)
+
+        gr_raw = grNb.gBorgis_parallel(l_box, x_current, x_low, 10.0, r_bin, x_cut , method='out', min_radius=0, 
+                configs_path=params['prefix_file'], ordered_indices_file=params['wt_file'], max_config_nb=params['n_max_wt'])
+
 
         gr_res = np.zeros(qdim)
         for j in range(binmax):
             if method == 'in':
-                temp = 1. - gr_raw[j] / prefactor
+                delta_pot = gr_raw[binlow] / prefactor
+                temp =  gr_raw[j] / prefactor 
                 gr_res[j] = abs(((1. - delta_tgt) * temp + (delta_tgt - delta_pot)) / (1. - delta_pot))
             elif method == 'out':
-                temp = gr_raw[j] / prefactor
-                gr_res[j] = temp / delta_pot
+                temp =  1 - gr_raw[j] / prefactor #edit eh 1-
+                delta_pot = 1 - gr_raw[binlow] / prefactor
+                gr_res[j] = abs(((1. - delta_tgt) * temp + (delta_tgt - delta_pot)) / (1. - delta_pot))
 
         g_current = gr_res[binlow:bincut]
 
