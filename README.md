@@ -31,7 +31,7 @@ python3 grinter_parallel.py
 To organize and analyze the output:
 ```bash
 bash Gen_res.sh
-```
+```lj_56x60_1.forceIBI
 Results will be saved automatically in the `Results/` directory. 
 
 ---
