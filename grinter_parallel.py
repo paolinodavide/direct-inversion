@@ -4,6 +4,8 @@ import gr_pair as pair
 import gr_iteration as it
 import gr_borgis as grNb
 import time 
+import os
+import shutil
 
 def load_config():
     with open("config.json") as f:
@@ -31,7 +33,7 @@ def load_target_gr(params, qdim):
 def compute_prefactor(n_part, rho, temperature=1.0):
     """ No need anymore to divide by n_correl_wt, grNb returns the average 
     The 4 is needed as the LJ potential in it.get_pot is divided by 4.
-    Temperature is incuded in the potential."""
+    Temperature is incuded in the potential energy."""
     return 2 * np.pi * rho * n_part / 4
 
 def build_dict(entries):
@@ -43,6 +45,12 @@ def compute_error_metrics(g_target, g_current, u_target, u_current, x_low, x_cut
     return e_gr, e_pot
 
 def main():
+    # Remove the __pycache__ directory if it exists
+    pycache_path = os.path.join(os.getcwd(), "__pycache__")
+    if os.path.exists(pycache_path) and os.path.isdir(pycache_path):
+        shutil.rmtree(pycache_path)
+    
+    # Load parameters from config.json
     params = load_config()
 
     n_part = params['n_a_part'] + params['n_b_part']
@@ -54,6 +62,14 @@ def main():
     binmin, binlow, bincut, binmax = map(lambda x: int(x / r_bin), [x_min, x_low, x_cut, 10])
     pot_length = bincut - binlow
 
+    prefactor = compute_prefactor(n_part, rho)
+    precision = params['target_precision']
+    max_iter = params['max_iter']
+    method = params['method']
+    delta_reg = params['delta_reg']
+    T = params['Temperature']
+
+    #Load targets
     g_target_full = load_target_gr(params, qdim)
     g_target = g_target_full[binlow:bincut]
     delta_tgt = g_target_full[binlow]
@@ -65,15 +81,9 @@ def main():
     dict_pot = {'target': [[x_low + j*r_bin, u_target[j], x_target[j]] for j in range(pot_length)]}
     dict_err = {'gr': [], 'pot': [], 'delta_tgt': [], 'delta_pot': [], 'alpha_pot': []}
 
+    # Initialize potential
     u_current, x_current = initialize_potential(params, pot_length, r_bin, x_low)
     dict_pot['0'] = [[x_low + j*r_bin, u_current[j], x_current[j]] for j in range(pot_length)]
-
-    prefactor = compute_prefactor(n_part, rho)
-    precision = params['target_precision']
-    max_iter = params['max_iter']
-    method = params['method']
-    delta_reg = params['delta_reg']
-    T = params['Temperature']
 
     best_error = 1.
     best_index = 1

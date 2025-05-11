@@ -87,12 +87,12 @@ def grBorgis_notNorm(particle_positions, box_length, min_radius, r_bin, num_bins
                 dy_ij -= box_length * np.round(dy_ij / box_length)
 
                 d_ij_squared = dx_ij * dx_ij + dy_ij * dy_ij
-                if d_ij_squared == 0.0:  # Skip self-interaction
+                if d_ij_squared == 0.0 or d_ij_squared >= r_cut * r_cut:  # Skip self-interaction and cut-off
                     continue
                 d_ij = np.sqrt(d_ij_squared)
                 binIdx_ij = int(d_ij/ r_bin)
 
-                if d_ij <= r_cut and binIdx_ij > binlow:
+                if binIdx_ij > binlow:
                     alpha = d_ij / r_bin - binIdx_ij
                     force_magnitude = alpha * force_div_r[binIdx_ij - binlow] + (1 - alpha) * force_div_r[binIdx_ij - binlow + 1]
                 elif binIdx_ij <= binlow:
