@@ -6,7 +6,6 @@ This project implements Iterative Boltzmann Inversion (IBI) and related coarse-g
 ---
 ## ⚙️ Usage Guide
 > 🧵 All steps assume execution from within the `forceIBI/` directory.
-Cache is stored to improve performances: to clean it, just remove the `forceIBI/__pycache__` directory. 
 ### 1. Compile Cython Extensions
 ```bash
 python3 setup.py build_ext --inplace
@@ -17,7 +16,7 @@ Edit the file `forceIBI/gr_borgis.py` and set the number of cores (recommended: 
 NUM_THREADS = 8  # Example
 ```
 ### 3. Prepare Configuration Module
-Make sure that the configurations file are correctly compiled in `.npy` format.
+Ensure that the configuration files are correctly compiled in `.npy` format.
 Edit your configuration file and generate the module:
 ```bash
 python3 make_config_iter.py
@@ -27,7 +26,7 @@ Execute the main routine:
 ```bash
 python3 grinter_parallel.py
 ```
-### 7. Generate and Parse Results
+### 5. Generate and Parse Results
 To organize and analyze the output:
 ```bash
 bash Gen_res.sh
@@ -40,8 +39,8 @@ Results will be saved automatically in the `Results/` directory.
 ```
 project-root/
 ├── forceIBI/                # Core scripts and modules
-│   ├── gr_borgis.py         # Contains main function for Borgis Formula implementation
-│   ├── grinter_parallel.py  # Contains main potential convergence loop
+│   ├── gr_borgis.py         # Contains the main function for Borgis Formula implementation
+│   ├── grinter_parallel.py  # Contains the main potential convergence loop
 │   ├── *.py                 # Python scripts
 │   ├── *.pyx                # Cython code
 │   ├── *.cpp                # (Deprecated) C++ scripts
@@ -57,6 +56,7 @@ project-root/
 ## 📝 Notes
 - Do **not** place configuration folders inside subdirectories — they must be located directly in the project root.
 - The `gen_pos.py` script is now deprecated and no longer required.
-- the `format_data.py` script now also converts the files from `.dat` to `.npy`. 
+- The `format_data.py` script now also converts files from `.dat` to `.npy`. 
 - The `Results/` folder will be created automatically if it doesn't exist.
-- Target RDFs and waiting time list should be saved in `project-root` directory.
+- Target RDFs and waiting time lists should be saved in the `project-root` directory.
+- Cache is stored to improve performance; however, outdated caches might lead to ineffective runs. To address this, `grinter_parallel` includes a routine to reset the `forceIBI/__pycache__` directory at each run, clearing the cache. However, this may not always suffice. An additional run should resolve the issue in such cases.   

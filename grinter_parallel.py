@@ -46,9 +46,11 @@ def compute_error_metrics(g_target, g_current, u_target, u_current, x_low, x_cut
 
 def main():
     # Remove the __pycache__ directory if it exists
-    pycache_path = os.path.join(os.getcwd(), "__pycache__")
-    if os.path.exists(pycache_path) and os.path.isdir(pycache_path):
-        shutil.rmtree(pycache_path)
+    clearCache = True
+    if clearCache:
+        pycache_path = os.path.join(os.getcwd(), "__pycache__")
+        if os.path.exists(pycache_path) and os.path.isdir(pycache_path):
+            shutil.rmtree(pycache_path)
     
     # Load parameters from config.json
     params = load_config()
