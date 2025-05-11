@@ -1,4 +1,4 @@
-# 🧪 Force IBI Project
+# 🥊 Force IBI Project
 
 This project implements Iterative Boltzmann Inversion (IBI) and related coarse-grained force field optimization techniques. The code is modular and optimized for Python with optional Cython acceleration.
 
@@ -12,7 +12,7 @@ Cache is stored to improve performances: to clean it, just remove the `forceIBI/
 python3 setup.py build_ext --inplace
 ```
 ### 2. Set Number of Threads
-Edit the file `forceIBI/borgis.py` and set the number of cores (recommended: 8): 
+Edit the file `forceIBI/gr_borgis.py` and set the number of cores (recommended: 8): 
 ```python
 NUM_THREADS = 8  # Example
 ```
@@ -31,7 +31,7 @@ python3 grinter_parallel.py
 To organize and analyze the output:
 ```bash
 bash Gen_res.sh
-```lj_56x60_1.forceIBI
+```
 Results will be saved automatically in the `Results/` directory. 
 
 ---
