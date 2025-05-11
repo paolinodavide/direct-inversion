@@ -13,7 +13,7 @@ params['n_totstep'] = 500000
 # initial length of list of waiting times
 params['n_correl_wt'] = 1000
 # maximum number of waiting times
-params['n_max_wt'] = 500
+params['n_max_wt'] = 125
 # log time axis or linear axis (False -> linear)
 params['log_lin'] = False
 # size of the simulation box

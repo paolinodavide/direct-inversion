@@ -9,10 +9,6 @@ def load_config():
     with open("config.json") as f:
         return json.load(f)
 
-def load_positions():
-    with open("positions.json") as f:
-        return json.load(f)['wt']
-
 def initialize_potential(params, pot_length, r_bin, x_low):
     if params['INIT']:
         u = it.get_pot(params['init_pot'], pot_length, r_bin, x_low, params['Temperature'])
@@ -32,7 +28,7 @@ def load_target_gr(params, qdim):
         g_target[:len(data)] = data[:, 1]
     return g_target
 
-def compute_prefactor(n_part, rho, n_correl_wt, temperature=1.0):
+def compute_prefactor(n_part, rho, temperature=1.0):
     """ No need anymore to divide by n_correl_wt, grNb returns the average 
     The 4 is needed as the LJ potential in it.get_pot is divided by 4.
     Temperature is incuded in the potential."""
@@ -48,7 +44,6 @@ def compute_error_metrics(g_target, g_current, u_target, u_current, x_low, x_cut
 
 def main():
     params = load_config()
-    cor_wt = load_positions()
 
     n_part = params['n_a_part'] + params['n_b_part']
     l_box = params['l_box']
@@ -73,7 +68,7 @@ def main():
     u_current, x_current = initialize_potential(params, pot_length, r_bin, x_low)
     dict_pot['0'] = [[x_low + j*r_bin, u_current[j], x_current[j]] for j in range(pot_length)]
 
-    prefactor = compute_prefactor(n_part, rho, len(cor_wt))
+    prefactor = compute_prefactor(n_part, rho)
     precision = params['target_precision']
     max_iter = params['max_iter']
     method = params['method']

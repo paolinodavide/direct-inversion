@@ -6,6 +6,7 @@ This project implements Iterative Boltzmann Inversion (IBI) and related coarse-g
 ---
 ## ⚙️ Usage Guide
 > 🧵 All steps assume execution from within the `forceIBI/` directory.
+Cache is stored to improve performances, in order to clean it remove the `forceIBI/__pycache__` directory. 
 ### 1. Compile Cython Extensions
 ```bash
 python3 setup.py build_ext --inplace
