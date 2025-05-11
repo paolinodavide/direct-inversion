@@ -1,5 +1,6 @@
 # Ignore the build directory
 build/
+__pycache__/
 
 # Ignore all JSON files
 *.json
@@ -9,3 +10,6 @@ build/
 *.o
 *.html
 *.c
+
+# Ignore all log files
+*.log
