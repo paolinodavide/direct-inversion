@@ -16,8 +16,8 @@ Edit the file `forceIBI/gr_borgis.py` and set the number of cores (recommended: 
 NUM_THREADS = 8  # Example
 ```
 ### 3. Prepare Configuration Module
-Ensure that the configuration files are correctly compiled in `.npy` format.
-Edit your configuration file and generate the module:
+Ensure that the system configuration files are correctly compiled in `.npy` format.
+Edit your parameters file and generate the dictionary:
 ```bash
 python3 make_config_iter.py
 ```
