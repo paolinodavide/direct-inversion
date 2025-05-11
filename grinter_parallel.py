@@ -2,7 +2,7 @@ import json
 import numpy as np
 import gr_pair as pair
 import gr_iteration as it
-import borgis as grNb
+import gr_borgis as grNb
 import time 
 
 def load_config():

@@ -6,7 +6,7 @@ This project implements Iterative Boltzmann Inversion (IBI) and related coarse-g
 ---
 ## ⚙️ Usage Guide
 > 🧵 All steps assume execution from within the `forceIBI/` directory.
-Cache is stored to improve performances, in order to clean it remove the `forceIBI/__pycache__` directory. 
+Cache is stored to improve performances: to clean it, just remove the `forceIBI/__pycache__` directory. 
 ### 1. Compile Cython Extensions
 ```bash
 python3 setup.py build_ext --inplace
@@ -40,7 +40,7 @@ Results will be saved automatically in the `Results/` directory.
 ```
 project-root/
 ├── forceIBI/                # Core scripts and modules
-│   ├── borgis.py            # Contains main function for Borgis Formula implementation
+│   ├── gr_borgis.py         # Contains main function for Borgis Formula implementation
 │   ├── grinter_parallel.py  # Contains main potential convergence loop
 │   ├── *.py                 # Python scripts
 │   ├── *.pyx                # Cython code
