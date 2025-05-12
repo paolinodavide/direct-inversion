@@ -83,6 +83,7 @@ while (index < len(List_column)):
         index += 1
 
 save_times.close()
+print("Configs files created in ./configs")
 
 # Convert the .dat files to .npy files
 # Create the output directory if it doesn't exist
@@ -99,3 +100,5 @@ for file_name in filter(lambda f: f.endswith(".dat"), os.listdir("./configs")):
     # Save the numpy array to a .npy file
     npy_file_path = os.path.join("./configs_npy", file_name.replace(".dat", ".npy"))
     np.save(npy_file_path, data_array)
+
+print("Conversion to .npy files completed.")
