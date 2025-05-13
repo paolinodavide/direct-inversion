@@ -10,17 +10,17 @@ OUTPUT_HISTO_JSON = './src/histo.json'
 OUTPUT_SMOOTH_JSON = './src/smooth.json'
 
 # Window parameters - grouped together for clarity
-WINDOW1_MIN = 0.80
-WINDOW1_MAX = 1.15
+WINDOW1_MIN = 0.40
+WINDOW1_MAX = 1.4
 
-WINDOW2_MIN = 1.02
+WINDOW2_MIN = 0.95
 WINDOW2_MAX = 5
 
-OVERLAP_CENTER = 1.124
+OVERLAP_CENTER = 0.9965
 R_MAX = 10
 DR = 0.002
 
-p1 = 0.999999
+p1 = 0.99999
 p2 = 0.9999
 
 def load_target_data(filename) -> dict:

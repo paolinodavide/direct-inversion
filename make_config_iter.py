@@ -30,8 +30,8 @@ params['x_cut'] = 2.5
 params['qdim_max'] = 5_000
 params['qdim'] = 60000
 # minimum length for the potential
-params['x_min'] = 0.881
-params['x_low'] = 0.93
+params['x_min'] = 0.425#65689
+params['x_low'] = 0.52
 # file for target g(r)
 params['target_file'] = '../gs_target.dat'
 # target precision

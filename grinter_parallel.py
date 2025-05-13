@@ -30,11 +30,14 @@ def load_target_gr(params, qdim):
         g_target[:len(data)] = data[:, 1]
     return g_target
 
-def compute_prefactor(n_part, rho, temperature=1.0):
+def compute_prefactor(n_part, rho, isLJ, temperature=1.0):
     """ No need anymore to divide by n_correl_wt, grNb returns the average 
     The 4 is needed as the LJ potential in it.get_pot is divided by 4.
     Temperature is incuded in the potential energy."""
-    return 2 * np.pi * rho * n_part / 4
+    correction = 1
+    if isLJ:
+        correction = 4 
+    return 2 * np.pi * rho * n_part / correction
 
 def build_dict(entries):
     return [[x, y, z] for x, y, z in zip(*entries)]
@@ -63,8 +66,9 @@ def main():
     x_min, x_low, x_cut = params['x_min'], params['x_low'], params['x_cut']
     binmin, binlow, bincut, binmax = map(lambda x: int(x / r_bin), [x_min, x_low, x_cut, 10])
     pot_length = bincut - binlow
+    isLJ = False
 
-    prefactor = compute_prefactor(n_part, rho)
+    prefactor = compute_prefactor(n_part, rho, isLJ)
     precision = params['target_precision']
     max_iter = params['max_iter']
     method = params['method']
@@ -76,8 +80,8 @@ def main():
     g_target = g_target_full[binlow:bincut]
     delta_tgt = g_target_full[binlow]
 
-    u_target = it.get_pot('lj_full', pot_length, r_bin, x_low, params['Temperature'])
-    x_target = it.init_x(pot_length, r_bin, x_low, params['Temperature'])
+    u_target = it.get_pot('r3', pot_length, r_bin, x_low, params['Temperature'])
+    x_target = it.get_x(u_target, x_low, r_bin, pot_length)
 
     dict_gr = {'target': [[j * r_bin, g_target_full[j]] for j in range(qdim)]}
     dict_pot = {'target': [[x_low + j*r_bin, u_target[j], x_target[j]] for j in range(pot_length)]}

@@ -198,7 +198,7 @@ def main():
     max_radius = 10.0
     x_cut = 2.5
     method = 'out'
-    rlow = 0.93
+    rlow = 0.99
     pot_length = int((x_cut - rlow) / bin_width)
 
     # Load the binned force data (example)
