@@ -6,8 +6,9 @@ from functools import partial
 from numba import njit
 from cProfile import Profile
 import pstats
+import shutil
 
-import gr_iteration as it
+import forceIBI.gr_iteration as it
 
 global NUM_THREADS
 NUM_THREADS = 12
@@ -68,7 +69,6 @@ def gBorgis_numpy(file, box_size, binned_force, bins):
 
     return np.cumsum(gr_contributions)
 
-
 @njit(fastmath=True, cache=True) #Clear the cache if you want to recompile
 def grBorgis_notNorm(particle_positions, box_length, min_radius, r_bin, num_bins, force_div_r, rlow, r_cut, method='out'):
     """Compute the Borgis g(r) using Numba for a given configuration file. The normalization is not included."""
@@ -87,12 +87,12 @@ def grBorgis_notNorm(particle_positions, box_length, min_radius, r_bin, num_bins
                 dy_ij -= box_length * np.round(dy_ij / box_length)
 
                 d_ij_squared = dx_ij * dx_ij + dy_ij * dy_ij
-                if d_ij_squared == 0.0 or d_ij_squared >= r_cut * r_cut:  # Skip self-interaction and cut-off
+                if d_ij_squared == 0.0 or d_ij_squared > r_cut * r_cut:  # Skip self-interaction and cut-off
                     continue
                 d_ij = np.sqrt(d_ij_squared)
                 binIdx_ij = int(d_ij/ r_bin)
 
-                if binIdx_ij > binlow:
+                if binIdx_ij > binlow: #Already below the cut-off
                     alpha = d_ij / r_bin - binIdx_ij
                     force_magnitude = alpha * force_div_r[binIdx_ij - binlow] + (1 - alpha) * force_div_r[binIdx_ij - binlow + 1]
                 elif binIdx_ij <= binlow:
@@ -120,9 +120,11 @@ def grBorgis_notNorm(particle_positions, box_length, min_radius, r_bin, num_bins
                 continue
             d_ij = np.sqrt(d_ij_squared)
 
-            binIndex_ij = int((d_ij - min_radius) / r_bin)
-            if binIndex_ij < 0 or binIndex_ij >= num_bins:
+            binIndex_ij = int((d_ij) / r_bin)
+            if binIndex_ij < 0:
                 continue
+            if binIndex_ij >= num_bins:
+                binIndex_ij = int(r_cut / r_bin) - 1 if method == 'out' else int(r_cut / r_bin) 
             # Delta_ij = ((Fi − Fj) ⋅ rij) / r²
             force_diff_x = net_forces[i, 0] - net_forces[j, 0]
             force_diff_y = net_forces[i, 1] - net_forces[j, 1]
