@@ -8,7 +8,7 @@ from cProfile import Profile
 import pstats
 import shutil
 
-import forceIBI.gr_iteration as it
+import gr_iteration as it
 
 global NUM_THREADS
 NUM_THREADS = 12
@@ -69,7 +69,7 @@ def gBorgis_numpy(file, box_size, binned_force, bins):
 
     return np.cumsum(gr_contributions)
 
-@njit(fastmath=True, cache=True) #Clear the cache if you want to recompile
+@njit(fastmath=False) #Clear the cache if you want to recompile
 def grBorgis_notNorm(particle_positions, box_length, min_radius, r_bin, num_bins, force_div_r, rlow, r_cut, method='out'):
     """Compute the Borgis g(r) using Numba for a given configuration file. The normalization is not included."""
     num_particles, dimensions = particle_positions.shape
@@ -124,7 +124,8 @@ def grBorgis_notNorm(particle_positions, box_length, min_radius, r_bin, num_bins
             if binIndex_ij < 0:
                 continue
             if binIndex_ij >= num_bins:
-                binIndex_ij = int(r_cut / r_bin) - 1 if method == 'out' else int(r_cut / r_bin) 
+                binIndex_ij = num_bins - 1 if method == 'out' else num_bins 
+                
             # Delta_ij = ((Fi − Fj) ⋅ rij) / r²
             force_diff_x = net_forces[i, 0] - net_forces[j, 0]
             force_diff_y = net_forces[i, 1] - net_forces[j, 1]
@@ -133,10 +134,15 @@ def grBorgis_notNorm(particle_positions, box_length, min_radius, r_bin, num_bins
 
     # 3) Cumulative sum of contributions
     if method == 'in':
-        borgis_contributions = np.cumsum(borgis_contributions)
+        g0 = np.cumsum(borgis_contributions)
+        return g0
     elif method == 'out':
-        borgis_contributions = np.cumsum(borgis_contributions[::-1])[::-1]
-    return borgis_contributions
+        gInf = np.cumsum(borgis_contributions[::-1])[::-1]
+        return gInf
+    elif method == 'both':
+        return borgis_contributions
+    else:
+        raise ValueError("Invalid method. Choose 'in', 'out', or 'both'.")
 
 def cmpt_borgis_from_file(file_path, box_length, min_radius, bin_width, num_bins, force_bins, rlow, r_cut, method):
 
@@ -159,8 +165,7 @@ def gBorgis_parallel(box_length,force_div_r, x_low, max_radius, bin_width, x_cut
 
     # Load ordered indices from file
     ordered_indices = np.loadtxt(ordered_indices_file, dtype=int)
-    if max_config_nb > 0:
-        ordered_indices = ordered_indices[:max_config_nb]
+    ordered_indices = ordered_indices[:max_config_nb]
 
     # Generate list of configuration files
     config_files = [
@@ -172,8 +177,6 @@ def gBorgis_parallel(box_length,force_div_r, x_low, max_radius, bin_width, x_cut
 
     # Warm up compilation with the first configuration file
     _ = cmpt_borgis_from_file(config_files[0], box_length, min_radius, bin_width, num_bins, x_current, x_low, x_cut, method)
-    # Add this after function definition
-    #_ = grBorgis_notNorm(np.random.rand(10,2), 1.0, 0.1, 0.01, 100, np.zeros(100), 0.5, 2.5, 'out')
 
     # Parallel computation using multiprocessing
     with Pool(NUM_THREADS) as pool:
@@ -206,12 +209,14 @@ def main():
     # Load the binned force data (example)
     potential = it.get_pot('lj_full', pot_length, bin_width, rlow, 1.0)
     force_div_r = it.get_x(potential, rlow, bin_width, pot_length)
+    prefactor = 2 *np.pi * 2025**2 / box_length**2 /4
 
     profiler = Profile()
     profiler.enable()
     
     # Compute gBorgis
-    gr_result = gBorgis_parallel(box_length, force_div_r, rlow, max_radius, bin_width, x_cut, method=method)
+    gr_inf = 1 - gBorgis_parallel(box_length, force_div_r, rlow, max_radius, bin_width, x_cut, method='out')/prefactor
+    gr_zero = gBorgis_parallel(box_length, force_div_r, rlow, max_radius, bin_width, x_cut, method='in') / prefactor
 
     profiler.disable()
     stats = pstats.Stats(profiler)
@@ -220,7 +225,19 @@ def main():
         stats.stream = log_file
         stats.print_stats()
     
-    
+    # Plot gr_inf and gr_zero
+    r_values = np.arange(min_radius, max_radius, bin_width)
+    plt.figure(figsize=(10, 6))
+    plt.plot(r_values, gr_inf, 'o-', label="g(r) - out", color="blue")
+    plt.plot(r_values, gr_zero, 'o-', label="g(r) - in", color="red")
+    plt.xlabel("r")
+    plt.ylabel("g(r)")
+    plt.title("Borgis g(r)")
+    plt.legend()
+    plt.grid()
+    plt.savefig("gr_plot.png")
+    plt.show()
+    return
 
 if __name__ == "__main__":
     main()
