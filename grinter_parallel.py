@@ -66,7 +66,10 @@ def main():
     x_min, x_low, x_cut = params['x_min'], params['x_low'], params['x_cut']
     binmin, binlow, bincut, binmax = map(lambda x: int(x / r_bin), [x_min, x_low, x_cut, 10])
     pot_length = bincut - binlow
+
     isLJ = False
+    if params['target_pot'].split('_')[0] == 'lj':
+        isLJ = True
 
     prefactor = compute_prefactor(n_part, rho, isLJ)
     precision = params['target_precision']
@@ -80,7 +83,7 @@ def main():
     g_target = g_target_full[binlow:bincut]
     delta_tgt = g_target_full[binlow]
 
-    u_target = it.get_pot('r3', pot_length, r_bin, x_low, params['Temperature'])
+    u_target = it.get_pot(params['target_pot'], pot_length, r_bin, x_low, params['Temperature'])
     x_target = it.get_x(u_target, x_low, r_bin, pot_length)
 
     dict_gr = {'target': [[j * r_bin, g_target_full[j]] for j in range(qdim)]}

@@ -32,7 +32,7 @@ def process_files(filetype, column_index, plot_title, ylabel):
         if data is not None:
             positions = data[:, 0]
             y_data = data[:, column_index]
-            plot_data(positions, y_data, f"{plot_title} vs Positions", "Position", ylabel, label=file)
+            plot_data(positions, y_data, f"{plot_title} vs Positions", r"$r / \sigma$", ylabel, label=file)
     plt.savefig(f"{filetype}.svg", format="svg")
     plt.show()
 
@@ -45,18 +45,18 @@ def plot_error(filetype):
         last_column = data[:, -1]
 
         plt.subplot(1, 2, 1)
-        plt.scatter(range(len(first_column)), first_column, label="First Column")
-        plt.title(f"{filetype} - First Column vs Line Index")
-        plt.xlabel("Line Index")
-        plt.ylabel("First Column")
+        plt.semilogy(range(len(first_column)), first_column, 'o-', label=r"$\Delta(g)^2$")
+        plt.title("Delta(g)^2 vs Iteration Number")
+        plt.xlabel("Iteration")
+        plt.ylabel("Error")
         plt.grid(linestyle='--')
         plt.legend()
 
         plt.subplot(1, 2, 2)
-        plt.scatter(range(len(last_column)), last_column, label="Last Column")
-        plt.title(f"{filetype} - Last Column vs Line Index")
-        plt.xlabel("Line Index")
-        plt.ylabel("Last Column")
+        plt.semilogy(range(len(last_column)), last_column, 'o-', label=r"$\Delta(\text{iter})^2$")
+        plt.title("Delta(iter)^2 vs Iteration Number")
+        plt.xlabel("Iteration")
+        plt.ylabel("Err")
         plt.grid(linestyle='--')
         plt.legend()
 
@@ -80,13 +80,13 @@ def plot_final():
         if data is not None:
             positions = data[:, 0]
             y_data = data[:, 1] if ylabel != 'Force' else data[:, 2]
-            plot_data(positions, y_data, f"{title} vs Positions", "Position", ylabel, label=files[-1], style='o')
+            plot_data(positions, y_data, f"{title} vs Positions", r"$r/\sigma$", ylabel, label=files[-1], style='o')
 
         target_data = load_data(target_file)
         if target_data is not None:
             target_positions = target_data[:, 0]
             target_y_data = target_data[:, 1] if ylabel != 'Force' else target_data[:, 2]
-            plot_data(target_positions, target_y_data, f"{title} vs Positions", "Position", ylabel, label=target_file, style='--')
+            plot_data(target_positions, target_y_data, f"{title} vs Positions", r"$r/\sigma$", ylabel, label=target_file, style='--')
     plt.tight_layout()
     plt.show()
 
