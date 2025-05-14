@@ -36,8 +36,9 @@ params['x_low'] = 0.93
 params['target_file'] = '../gs_target.dat'
 # target precision
 params['target_precision'] = 0
+params['iteration_precision'] = 10e-9
 params['output_file'] = 'gr_final.dat'
-params['max_iter'] = 50
+params['max_iter'] = 100
 params['method'] = 'out'
 params['Temperature'] = 1
 params['init_pot'] = 'lj_full'

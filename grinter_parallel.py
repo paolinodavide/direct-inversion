@@ -72,7 +72,6 @@ def main():
         isLJ = True
 
     prefactor = compute_prefactor(n_part, rho, isLJ)
-    precision = params['target_precision']
     max_iter = params['max_iter']
     method = params['method']
     delta_reg = params['delta_reg']
@@ -161,8 +160,11 @@ def main():
 
         dict_pot[str(iteration)] = [[x_low + j*r_bin, u_current[j], x_current[j]] for j in range(pot_length)]
 
-        if err_gr < precision:
+        if err_gr < params['target_precision'] and iteration > 1:
             print(f"Target precision reached at iteration {iteration}")
+            break
+        if err_iteration < params['iteration_precision'] and iteration > 1:
+            print(f"Iteration precision reached at iteration {iteration}")
             break
 
         iteration += 1
