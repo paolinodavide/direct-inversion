@@ -18,10 +18,10 @@ params['n_max_wt'] = 125
 params['log_lin'] = False
 # size of the simulation box
 params['l_box'] = 60
-# size of the histogram bin for g(r) (?)
+# size of the histogram bin for g(r) 
 params['r_bin'] = 0.002
 # prefix for the location of datafiles
-params['prefix_file'] = '../configs_npy/lj'
+params['prefix_file'] = '../configs_npy/wca' #Recall to change this
 # output file for waitingtimes
 params['wt_file'] = '../ordered_wt.dat'
 # cutoff in the lj potential
@@ -33,7 +33,7 @@ params['qdim'] = 60000
 params['x_min'] = 0.881
 params['x_low'] = 0.93
 # file for target g(r)
-params['target_file'] = '../gr_weighted.dat'
+params['target_file'] = '../gs_target.dat'
 # target precision
 params['target_precision'] = 0
 params['output_file'] = 'gr_final.dat'
