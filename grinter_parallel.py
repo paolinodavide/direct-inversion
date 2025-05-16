@@ -11,9 +11,12 @@ def load_config():
     with open("config.json") as f:
         return json.load(f)
 
-def initialize_potential(params, pot_length, r_bin, x_low):
-    if params['INIT']:
+def initialize_potential(params, pot_length, r_bin, x_low, g_target=None):
+    if params['INIT'] and params['init_pot'] != 'mean_force':
         u = it.get_pot(params['init_pot'], pot_length, r_bin, x_low, params['Temperature'])
+        x = it.get_x(u, x_low, r_bin, pot_length)
+    elif params['INIT'] and params['init_pot'] == 'mean_force':
+        u = -np.log(g_target) 
         x = it.get_x(u, x_low, r_bin, pot_length)
     else:
         data = np.genfromtxt(f"{params['init_pot']}.dat", delimiter='\t', usecols=(0, 1, 2))
@@ -68,7 +71,7 @@ def main():
     pot_length = bincut - binlow
 
     isLJ = False
-    if params['target_pot'].split('_')[0] == 'lj':
+    if params['target_pot'].split('_')[0] in ['lj', 'wca']:
         isLJ = True
 
     prefactor = compute_prefactor(n_part, rho, isLJ)
@@ -90,7 +93,7 @@ def main():
     dict_err = {'gr': [], 'pot': [], 'delta_tgt': [], 'delta_pot': [], 'alpha_pot': []}
 
     # Initialize potential
-    u_current, x_current = initialize_potential(params, pot_length, r_bin, x_low)
+    u_current, x_current = initialize_potential(params, pot_length, r_bin, x_low, g_target)
     dict_pot['0'] = [[x_low + j*r_bin, u_current[j], x_current[j]] for j in range(pot_length)]
 
     best_error = 1.
@@ -132,6 +135,10 @@ def main():
         err_pot = pair.get_error(u_target, u_current, x_low, x_cut, r_bin)
         err_iteration = pair.get_error(g_current, g_previous, x_low, x_cut, r_bin) if iteration > 1 else 0
         
+        if np.isnan(err_pot):
+            print("Error: Potential energy is NaN. Please rerun.")
+            break
+
         dict_err['iteration'] = dict_err.get('iteration', [])
         dict_err['iteration'].append(err_iteration)
         dict_err['gr'].append(err_gr)

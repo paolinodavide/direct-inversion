@@ -9,7 +9,7 @@ cdef double lj_x(double x, double T):
 
 	return 1./T*(12.*x**(-14) - 6.*x**(-8) )
 
-cdef double lj_force(double x, double T):
+cdef double lj_full(double x, double T):
 	""" Lennard-Jones potential."""
 
 	return 1./T*( x**(-12) - x**(-6) )
@@ -42,7 +42,7 @@ cpdef double[:] get_pot(str name, int pot_length, double r_bin, double x_min, do
 	elif (name == 'lj_full'):
 		for i in range(0, pot_length):
 			x = x_min + i*r_bin
-			pot_list[i] = lj_force(x, T)
+			pot_list[i] = lj_full(x, T)
 		offset = pot_list[pot_length - 1]
 		for i in range(0, pot_length):
 			pot_list[i] -= offset
@@ -71,6 +71,15 @@ cpdef double[:] get_pot(str name, int pot_length, double r_bin, double x_min, do
 		for i in range(0, pot_length):
 			pot_list[i] -= offset
 		return pot_list
+	elif (name == 'wca'):
+		for i in range(0, pot_length):
+			x = x_min + i*r_bin
+			pot_list[i] = lj_full(x, T) if x < 2.**(1./6.) else lj_full(2.**(1./6.), T)
+		offset = pot_list[pot_length - 1]
+		for i in range(0, pot_length):
+			pot_list[i] -= offset
+		return pot_list
+
 	elif (name == 'r3'):
 		for i in range(0, pot_length):
 			x = x_min + i*r_bin

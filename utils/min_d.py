@@ -5,59 +5,89 @@ from scipy.spatial.distance import pdist
 from tqdm import tqdm
 from multiprocessing import Pool
 import glob
+from numba import njit
 import matplotlib.pyplot as plt
 
-def find_lj_config_files(directory='./configs/', pattern='lj_*.dat'):
+def find_config_files(directory='./configs/', pattern='*.dat'):
     """Find all LJ configuration files in the directory"""
     files = glob.glob(os.path.join(directory, pattern))
     # Extract numbers from filenames and sort numerically
     files.sort(key=lambda x: int(x.split('_')[-1].split('.')[0]))
     return files
 
-def calculate_fileNb_minDistance(file_path, dim=2) :
+
+@njit
+def minDistance_from_positions(positions, box_size, dim=2):
+    N = len(positions)
+    dist_nd_sq = np.zeros(N * (N - 1) // 2)  # to match the result of pdist
+    idx = 0
+
+    for i in range(N - 1):
+        for j in range(i + 1, N):
+            dist_sq = 0.0
+            for d in range(dim):
+                dist_1d = positions[i, d] - positions[j, d]
+                dist_1d -= box_size * np.round(dist_1d / box_size)  # Apply periodic boundary conditions
+                dist_sq += dist_1d ** 2
+            dist_nd_sq[idx] = dist_sq
+            idx += 1
+
+    dist_nd = np.sqrt(dist_nd_sq)
+    return np.min(dist_nd)
+
+def minDistance_from_file(file_path, dim=2):
     box_size = np.loadtxt(file_path, comments=None, max_rows=1, usecols=-1)
     positions = np.loadtxt(file_path, skiprows=1)
 
-    N = len(positions)
-    
-    dist_nd_sq = np.zeros(N * (N - 1) // 2)  # to match the result of pdist
-    for d in range(dim):
-        pos_1d = positions[:, d][:, np.newaxis]  # shape (N, 1)
-        dist_1d = pdist(pos_1d)  # shape (N * (N - 1) // 2, )
-        dist_1d[dist_1d > box_size * 0.5] -= box_size
-        dist_nd_sq += dist_1d ** 2  # d^2 = dx^2 + dy^2 + dz^2
-    dist_nd = np.sqrt(dist_nd_sq)
-
+    min_distance = minDistance_from_positions(positions, box_size, dim)
     file_number = int(file_path.split('_')[-1].split('.')[0])
-    return file_number, np.min(dist_nd)
-
+    return file_number, min_distance
 
 def main():
-    files = find_lj_config_files()
+    files = find_config_files()
     if not files:
-        print("No LJ config files found in ./configs/")
+        print("No config files found in ./configs/")
         return
 
     print(f"Found {len(files)} files to process")
 
     # Process in parallel with progress bar
     with Pool() as pool:
-        results = list(tqdm(pool.imap(calculate_fileNb_minDistance, files), 
+        results = list(tqdm(pool.imap(minDistance_from_file, files), 
                         total=len(files),
                         desc="Processing RDFs"))
     
     # Extract file numbers and minimum distances
     file_numbers, min_distances = zip(*results)
 
-    # Plot the results
-
     plt.figure(figsize=(10, 6))
-    plt.plot(file_numbers, min_distances, marker='o', linestyle='-', color='b')
+    plt.subplot(1, 2, 1)
+    plt.scatter(file_numbers, min_distances, marker='o')
     plt.xlabel('File Number')
-    plt.ylabel('Minimum Distance')
-    plt.title('Minimum Distance vs File Number')
+    plt.ylabel(r'$d_{\text{min}} / \sigma$')
+    plt.title(f'Minimum Distance = {np.min(min_distances):.4f}' + r' $\sigma$')
     plt.grid(True)
-    plt.savefig('min_distance_plot.png')  # Save the plot as a PNG file
+
+    # Set y-axis limits
+    dr = 0.002
+    y_min, y_max = min(min_distances) - dr, max(min_distances) +dr
+    plt.ylim(y_min, y_max)
+
+    # Create histogram
+    plt.subplot(1, 2, 2)
+    bins = np.arange(y_min, y_max + 0.002, 0.002)
+    plt.hist(min_distances, bins=bins, alpha=0.7, orientation='horizontal')
+    plt.ylabel(r'$d_{\text{min}} / \sigma$')
+    plt.xlabel('Frequency')
+    plt.title('Histogram of Minimum Distances')
+    plt.grid(True)
+
+    # Set the same y-axis limits
+    plt.ylim(y_min, y_max)
+
+    # Save and show
+    plt.tight_layout()
+    plt.savefig('min_distance.png')
     plt.show()
 
     sorted_file_numbers = [file_number for file_number, _ in sorted(results, key=lambda x: x[1])]

@@ -67,6 +67,7 @@ def plot_error(filetype):
 
 def plot_final():
     """Plot the final data for 'gr', 'pot', and 'forces'."""
+    plt.figure(figsize=(16, 9))
     for i, (filetype, ylabel, title) in enumerate([('gr', 'g(r)', 'g(r)'),
                                                    ('pot', 'Potential', 'Potential'),
                                                    ('pot', 'Force', 'Force')], start=1):
@@ -76,17 +77,26 @@ def plot_final():
         files = sorted(files, key=lambda x: int(x.split('_')[-1].split('.')[0]), reverse=True)[:1]
         target_file = f"{filetype}_target.dat"
         
+        # Converged results
         data = load_data(files[-1])
         if data is not None:
             positions = data[:, 0]
             y_data = data[:, 1] if ylabel != 'Force' else data[:, 2]
             plot_data(positions, y_data, f"{title} vs Positions", r"$r/\sigma$", ylabel, label=files[-1], style='o')
 
+        # Target data
         target_data = load_data(target_file)
         if target_data is not None:
             target_positions = target_data[:, 0]
             target_y_data = target_data[:, 1] if ylabel != 'Force' else target_data[:, 2]
             plot_data(target_positions, target_y_data, f"{title} vs Positions", r"$r/\sigma$", ylabel, label=target_file, style='--')
+            if ylabel != 'g(r)':
+                MSE = np.linalg.norm(target_y_data - y_data)**2 / len(target_y_data)
+                SNR = 10 * np.log10(np.sum(target_y_data**2) / np.sum((target_y_data - y_data)**2))
+                plt.text(0.05, 0.95, f"MSE: {MSE:.4e}\nSNR: {SNR:.2f} dB", 
+                         transform=plt.gca().transAxes, fontsize=10, 
+                         verticalalignment='top', bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5))
+
     plt.tight_layout()
     plt.show()
 

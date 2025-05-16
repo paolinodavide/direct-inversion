@@ -25,12 +25,12 @@ params['prefix_file'] = '../configs_npy/wca' #Recall to change this
 # output file for waitingtimes
 params['wt_file'] = '../ordered_wt.dat'
 # cutoff in the lj potential
-params['x_cut'] = 2.5
+params['x_cut'] = 3.0
 # size of the r axis in the g(r) plot
 params['qdim_max'] = 5_000
 params['qdim'] = 60000
 # minimum length for the potential
-params['x_min'] = 0.881
+params['x_min'] = 0.876
 params['x_low'] = 0.93
 # file for target g(r)
 params['target_file'] = '../gs_target.dat'
@@ -41,8 +41,8 @@ params['output_file'] = 'gr_final.dat'
 params['max_iter'] = 100
 params['method'] = 'out'
 params['Temperature'] = 1
-params['init_pot'] = 'lj_full'
-params['target_pot'] = 'lj_full'
+params['init_pot'] = 'mean_force'
+params['target_pot'] = 'wca'
 params['delta_reg'] = 0.2
 # Decide if begins from an old config, or from scratch
 # Needs to store it as a string, json does not like booleans
