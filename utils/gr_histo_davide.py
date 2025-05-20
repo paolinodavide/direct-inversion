@@ -153,12 +153,13 @@ def main():
     valid_results = [res for res in results if res is not None]
     if valid_results:
         g_total = np.mean([g for g, _ in valid_results], axis=0)
+        var_g = np.std([g for g, _ in valid_results], axis=0)
         r = valid_results[0][1]
         
         # Save combined RDF
         np.savetxt('./rdfs/g_r_h_avg.dat', 
-                  np.column_stack((r, g_total)),
-                  header='# r g(r)')
+                  np.column_stack((r, g_total, var_g)),
+                  header='# r g(r) var_g(r)')
         print("All files processed successfully")
     else:
         print("No valid results were generated")

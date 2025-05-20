@@ -11,8 +11,9 @@ def get_weights(r, gr):
     g_masked = gr[mask]
     r_masked = r[mask]
 
+    max_g = np.max(g_masked)
     # Find indices where g_masked crosses 1
-    crossings = np.where(np.diff(np.sign(g_masked - 1)))[0]
+    crossings = np.where(np.diff(np.sign(g_masked - max_g/2)))[0]
 
     # Filter crossings to ensure at least 0.1 distance between them
     filtered_crossings = [crossings[0]] if len(crossings) > 0 else []
@@ -25,22 +26,22 @@ def get_weights(r, gr):
     if len(crossings) > 1:
         second_crossing_index = crossings[1]
         second_crossing_r = r_masked[second_crossing_index]
-        print(f"The second crossing of g_masked with 1 occurs at r = {second_crossing_r}")
+        print(f"The second crossing of g_masked with {max_g/2:.2f} occurs at r = {second_crossing_r}")
     else:
-        print("There is no second crossing of g_masked with 1.")
+        print(f"There is no second crossing of g_masked with {max_g/2:.2f}.")
 
     # Find the moment where g_masked oscillates around 1 with an amplitude of 0.02
     oscillation_start_index = None
     for i in range(len(g_masked)):
-        if np.all(np.abs(g_masked[i:] - 1) <= 10 * dr):  # Check the next 10 points
+        if np.all(np.abs(g_masked[i:] - 1) <= 20 * dr): 
             oscillation_start_index = i
             break
 
     if oscillation_start_index is not None:
         oscillation_start_r = r_masked[oscillation_start_index]
-        print(f"g_masked starts oscillating around 1 with an amplitude of 10*dr at r = {oscillation_start_r}")
+        print(f"g_masked starts oscillating around 1 with an amplitude of 20*dr at r = {oscillation_start_r}")
     else:
-        print("g_masked does not oscillate around 1 with an amplitude of 10*dr within the given range.")
+        print("g_masked does not oscillate around 1 with an amplitude of 20*dr within the given range.")
 
     weigths = np.ones_like(r)
     if len(crossings) > 1:
@@ -55,14 +56,44 @@ def get_weights(r, gr):
     # plt.legend()
     # plt.grid('--')
     # plt.show()
-    precision = dr
+    precision = dr / 2
     print(f"Lambda set to {precision:e}")
-    return weigths, dr
+    return weigths, precision
+    
+def newWeights(r, gr):
+    mask = gr > 0
+    g_masked = gr[mask]
+    r_masked = r[mask]
 
+    logGr = np.abs(np.log(g_masked))
+
+    peaks, _ = find_peaks(logGr, prominence=0.1)
+    peaks = np.append(0, peaks)
+    r_maxima = r_masked[peaks]
+    maxima = logGr[peaks]
+
+    slope, intercept = np.polyfit(np.log10(r_maxima), np.log10(maxima), 1)
+
+    # plt.plot(r_masked, logGr, 'o', label='Log g(r)', markersize=3)
+    # plt.plot(r_masked[peaks], maxima, 'o', label='Maxima', markersize=3)
+    # plt.plot(r_masked, 10**(slope * np.log10(r_masked) + intercept), 'r--', label='Fitted Line')
+
+    # plt.xlabel('r')
+    # plt.ylabel('Log g(r)')
+    # plt.legend()
+    # plt.grid('--')
+    # plt.show()
+
+    weights = np.ones_like(r) * 10**2
+    weights[mask] = 10**(slope * np.log10(r_masked) + intercept)
+    weights = weights **2
+    dr = r[1] - r[0]
+    return weights, dr**2
 
 def main():
-    r, g_r = np.loadtxt('./rdfs/g_r_h_avg.dat', unpack=True)
-    plt.plot(r, g_r, 'o', label='Noisy RDF', markersize=3)
+    r, g_r, var_g = np.loadtxt('./rdfs/g_r_h_avg.dat', unpack=True)
+    #plt.errorbar(r, g_r, yerr=np.sqrt(var_g), fmt='o', label='Histo RDF', markersize=3, capsize=1, elinewidth=0.5, alpha=0.5)
+    plt.plot(r, g_r, 'o', label='Histo RDF', markersize=3)
 
     # Load target RDF if available
     try:
@@ -84,10 +115,16 @@ def main():
         
         
     # Weighted spline
-    spline = make_smoothing_spline(r, g_r, w=weights, lam=precision)  # Adjust 's' as needed
+    spline = make_smoothing_spline(r, g_r, weights, precision)  # Adjust 's' as needed
 
+    g_smoothed = spline(r)
+    g_min = np.min(g_smoothed)
+    threshold = 1e-5
+    if g_min < -threshold:
+        print(f"Warning: g_smoothed has a minimum value of {g_min}, which is less than the threshold of {threshold}.")
     # Plot
-    plt.plot(r, spline(r), '--', label='Weighted Spline')
+    radii = np.linspace(r[0], r[-1], 10_000)
+    plt.plot(radii, spline(radii), '--', label='Weighted Spline')
     plt.xlabel('r')
     plt.ylabel('g(r)')
     plt.legend()
@@ -97,7 +134,6 @@ def main():
     output_file = 'gr_weighted.dat'
     np.savetxt(output_file, np.column_stack((r, spline(r))), delimiter='\t', header="# r\tg(r)", comments='')
     print(f"Weighted spline saved to {output_file}.")
-
     return
 
 if __name__ == "__main__":
