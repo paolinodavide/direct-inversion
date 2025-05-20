@@ -5,6 +5,7 @@ from tqdm import tqdm
 import glob
 from scipy.spatial.distance import pdist
 import matplotlib.pyplot as plt
+from numba import njit
 
 def find_lj_config_files(directory='./configs/', pattern='lj_*.dat'):
     """Find all LJ configuration files in the directory"""
@@ -30,7 +31,7 @@ def rdf_from_file(filename):
         positions = np.array(data)
 
         # Calculate RDF
-        r, g_r = calculate_rdf_scipy(positions, box_size, dr, r_max)
+        r, g_r = calculate_rdf_numba(positions, box_size, dr, r_max)
 
         # Save results
         file_num = os.path.basename(filename).split('_')[1].split('.')[0]
@@ -78,6 +79,56 @@ def calculate_rdf_scipy(positions, box_size, dr=0.02, r_max=10, dim=2):
     g_r /= (N * rho * ring_areas)
 
     return r, g_r
+
+@njit
+def calculate_rdf_numba(positions, box_size, dr=0.02, r_max=10, dim=2):
+    """Numba-optimized RDF calculation"""
+    N = len(positions)
+    rho = N / (box_size ** dim)
+    
+    if r_max > box_size / 2:
+        r_max = box_size / 2
+    
+    bins = np.arange(0, r_max + dr, dr)
+    r = bins[:-1] + dr/2
+    g_r = np.zeros_like(r)
+    
+    # Calculate all pairwise distances with PBC
+    n_pairs = N * (N - 1) // 2
+    dist_nd = np.zeros(n_pairs)
+    
+    for i in range(N):
+        for j in range(i + 1, N):
+            idx = i * (2 * N - i - 1) // 2 + j - i - 1
+            dist_sq = 0.0
+            for d in range(dim):
+                dx = positions[i, d] - positions[j, d]
+                dx = dx - box_size * np.round(dx / box_size)
+                dist_sq += dx * dx
+            dist_nd[idx] = np.sqrt(dist_sq)
+    
+    # Bin the distances
+    valid_dist = dist_nd[dist_nd < r_max]
+    bin_indices = (valid_dist / dr).astype(np.int64)
+    
+    # Count occurrences in each bin
+    counts = np.zeros(len(r), dtype=np.int64)
+    for idx in bin_indices:
+        if idx < len(counts):
+            counts[idx] += 1
+    
+    # Apply symmetry factor (count each pair only once)
+    g_r = counts * 2  # multiply by 2 to count i-j and j-i
+    
+    # Normalization
+    if dim == 2:
+        ring_areas = np.pi * (bins[1:]**2 - bins[:-1]**2)
+    else:  # dim == 3
+        ring_areas = (4/3) * np.pi * (bins[1:]**3 - bins[:-1]**3)
+    
+    g_r = g_r / (N * rho * ring_areas)
+    return r, g_r
+    
 
 def main():
     global dr, r_max

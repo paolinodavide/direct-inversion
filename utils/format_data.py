@@ -17,7 +17,7 @@ except IndexError:
 simu_file = str(sys.argv[1])
 
 # Common part of the file name
-prefix = 'lj_'
+prefix = simu_file.split('_')[0] + '_'
 suffix = '.dat'
 
 List_column = []
