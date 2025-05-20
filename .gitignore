@@ -13,3 +13,6 @@ __pycache__/
 
 # Ignore all log files
 *.log
+
+# Ignore make_config_iter.py
+make_config_iter.py
