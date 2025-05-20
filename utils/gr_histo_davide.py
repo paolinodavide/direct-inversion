@@ -6,6 +6,7 @@ import glob
 from scipy.spatial.distance import pdist
 import matplotlib.pyplot as plt
 from numba import njit
+import sys
 
 def find_lj_config_files(directory='./configs/', pattern='*.dat'):
     """Find all LJ configuration files in the directory"""
@@ -14,7 +15,7 @@ def find_lj_config_files(directory='./configs/', pattern='*.dat'):
     files.sort(key=lambda x: int(x.split('_')[-1].split('.')[0]))
     return files
 
-def rdf_from_file(filename):
+def rdf_from_file(filename, dr, r_max=10):
     """Process a single file to calculate RDF"""
     try:
         with open(filename, 'r') as f:
@@ -81,9 +82,9 @@ def calculate_rdf_scipy(positions, box_size, dr=0.02, r_max=10, dim=2):
     return r, g_r
 
 @njit
-def calculate_rdf_numba(positions, box_size, dr=0.02, r_max=10, dim=2):
+def calculate_rdf_numba(positions, box_size, dr=0.02, r_max=10):
     """Numba-optimized RDF calculation"""
-    N = len(positions)
+    N, dim = positions.shape
     rho = N / (box_size ** dim)
     
     if r_max > box_size / 2:
@@ -108,7 +109,7 @@ def calculate_rdf_numba(positions, box_size, dr=0.02, r_max=10, dim=2):
             dist_nd[idx] = np.sqrt(dist_sq)
     
     # Bin the distances
-    valid_dist = dist_nd[dist_nd < r_max]
+    valid_dist = dist_nd[dist_nd <= r_max + dr]
     bin_indices = (valid_dist / dr).astype(np.int64)
     
     # Count occurrences in each bin
@@ -128,12 +129,17 @@ def calculate_rdf_numba(positions, box_size, dr=0.02, r_max=10, dim=2):
     
     g_r = g_r / (N * rho * ring_areas)
     return r, g_r
-    
+
+def process_file(args):
+    file, dr = args
+    return rdf_from_file(file, dr) 
 
 def main():
-    global dr, r_max
-    dr = 0.002
-    r_max = 10
+    if len(sys.argv) > 1:
+        dr = float(sys.argv[1])
+    else:
+        print("Usage: python gr_histo_davide.py <dr> ")
+        sys.exit(1)
     
     # Find all files to process
     files = find_lj_config_files()
@@ -145,9 +151,10 @@ def main():
     
     # Process in parallel with progress bar
     with Pool() as pool:
-        results = list(tqdm(pool.imap(rdf_from_file, files), 
-                      total=len(files),
-                      desc="Processing RDFs"))
+        results = list(tqdm(pool.imap(process_file, [(file, dr) for file in files]), 
+                                  total=len(files),
+                                  desc="Processing RDFs"))
+
     
     # Combine results (if needed)
     valid_results = [res for res in results if res is not None]
