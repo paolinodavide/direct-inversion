@@ -133,8 +133,8 @@ def grBorgis_notNorm(particle_positions, box_length, min_radius, r_bin, num_bins
             Delta_ij = (force_diff_x * dx_ij + force_diff_y * dy_ij) / d_ij_squared
         
             if binIndex_ij >= num_bins:
-                #binIndex_ij = num_bins - 1 if method == 'out' else num_bins 
-                binIndex_ij = int(r_cut / r_bin) - 1
+                binIndex_ij = num_bins - 1 if method != 'in' else num_bins 
+                #binIndex_ij = int(r_cut / r_bin) - 1 #Older and wrong version
             
             borgis_contributions[binIndex_ij] += Delta_ij 
     
