@@ -72,13 +72,16 @@ def gBorgis_numpy(file, box_size, binned_force, bins):
     return np.cumsum(gr_contributions)
 
 @njit
-def periodic_boundary_conditions(dx, box_length):
+def periodic_boundary_conditions(dx, box_length, pythonRound=True):
     """Fastest PBC implementation using floor division."""
-    half_box = 0.5 * box_length
-    if dx >= 0:
-        return dx - box_length * np.floor((dx + half_box) / box_length)
+    if pythonRound is True:
+        return dx - box_length * np.round(dx / box_length)
     else:
-        return dx - box_length * np.ceil((dx - half_box) / box_length)
+        half_box = 0.5 * box_length
+        if dx >= 0:
+            return dx - box_length * np.floor((dx + half_box) / box_length)
+        else:
+            return dx - box_length * np.ceil((dx - half_box) / box_length)
 
 @njit
 def grBorgis_notNorm(particle_positions, box_length, min_radius, r_bin, num_bins, force_div_r, rlow, r_cut, method='out'):
