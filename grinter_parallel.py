@@ -67,7 +67,8 @@ def main():
     r_bin = params['r_bin']
     qdim = params['qdim_max']
     x_min, x_low, x_cut = params['x_min'], params['x_low'], params['x_cut']
-    binmin, binlow, bincut, binmax = map(lambda x: int(x / r_bin), [x_min, x_low, x_cut, 10])
+    x_max = 10.
+    binmin, binlow, bincut, binmax = map(lambda x: int(x / r_bin), [x_min, x_low, x_cut, x_max])
     pot_length = bincut - binlow
 
     isLJ = False
@@ -114,9 +115,12 @@ def main():
 
         x_current = np.asarray(x_current, dtype=np.float64)
 
-        gr_raw = grNb.gBorgis_parallel(l_box, x_current, x_low, 10.0, r_bin, x_cut , method='out', min_radius=0, 
+        if method =='both':
+            gr_raw = grNb.gBorgis_parallel_variance(l_box, x_current, x_low, x_max, r_bin, x_cut, prefactor=prefactor, 
                 configs_path=params['prefix_file'], ordered_indices_file=params['wt_file'], max_config_nb=params['n_max_wt'])
-
+        else:
+            gr_raw = grNb.gBorgis_parallel(l_box, x_current, x_low, x_max, r_bin, x_cut, method, min_radius=0.0,  
+                configs_path=params['prefix_file'], ordered_indices_file=params['wt_file'], max_config_nb=params['n_max_wt'])
 
         gr_res = np.zeros(qdim)
         for j in range(binmax):
@@ -127,6 +131,10 @@ def main():
             elif method == 'out':
                 temp =  1 - gr_raw[j] / prefactor #edit eh 1-
                 delta_pot = 1 - gr_raw[binlow] / prefactor
+                gr_res[j] = abs(((1. - delta_tgt) * temp + (delta_tgt - delta_pot)) / (1. - delta_pot))
+            elif method == 'both':
+                delta_pot = gr_raw[binlow] 
+                temp =  gr_raw[j]
                 gr_res[j] = abs(((1. - delta_tgt) * temp + (delta_tgt - delta_pot)) / (1. - delta_pot))
 
         g_current = gr_res[binlow:bincut]

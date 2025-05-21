@@ -6,10 +6,11 @@ from functools import partial
 from numba import njit
 from tqdm import tqdm
 from cProfile import Profile
+import time
 import pstats
 import shutil
 
-import forceIBI.gr_iteration as it
+import gr_iteration as it
 
 global NUM_THREADS
 NUM_THREADS = 12
@@ -201,6 +202,78 @@ def gBorgis_parallel(box_length,force_div_r, x_low, max_radius, bin_width, x_cut
     # Compute and return the mean g(r)
     return np.mean(borgis_results, axis=0)
 
+
+def gBorgis_parallel_variance(box_length,force_div_r, x_low, max_radius, bin_width, x_cut, prefactor,
+    configs_path="../configs_npy/lj", ordered_indices_file="../ordered_wt.dat", max_config_nb=-1):
+    """    
+    Compute the Borgis radial distribution function (g(r)) in parallel over multiple configuration files.
+    Notice that the function REQUIRES the normalization factor to be passed as an argument."""
+
+    min_radius = 0.00
+    # Calculate the number of bins
+    num_bins = int((max_radius - min_radius) / bin_width)
+
+    # Convert force_div_r to a numpy array
+    x_current = np.asarray(force_div_r)
+
+    # Load ordered indices from file
+    ordered_indices = np.loadtxt(ordered_indices_file, dtype=int)
+    ordered_indices = ordered_indices[:max_config_nb]
+
+    # Generate list of configuration files
+    config_files = [
+        f"{configs_path}_{i}.npy"
+        for i in ordered_indices
+        if os.path.exists(f"{configs_path}_{i}.npy")]
+
+    print(f"Evaluating Borgis g(r) for {len(config_files)} files...")
+
+    # Warm up compilation with the first configuration file
+    _ = cmpt_borgis_from_file(config_files[0], box_length, min_radius, bin_width, num_bins, x_current, x_low, x_cut, 'in')
+
+    # Parallel computation using multiprocessing
+    with Pool(NUM_THREADS) as pool:
+        borgis_results = list(
+            pool.imap(partial(cmpt_borgis_from_file,
+                    box_length=box_length,
+                    min_radius=min_radius,
+                    bin_width=bin_width,
+                    num_bins=num_bins,
+                    force_bins=x_current,
+                    rlow=x_low,
+                    r_cut=x_cut,
+                    method='both'),
+                config_files))
+    
+    gr0 = []
+    grInf = []
+    for result in borgis_results:
+        gr0.append(np.cumsum(result)/prefactor)
+        grInf.append(1 - np.cumsum(result[::-1])[::-1]/prefactor)
+    gr0 = np.array(gr0)
+    grInf = np.array(grInf)
+
+
+    Delta = grInf - gr0
+    meanDelta = np.mean(Delta, axis=0)
+    varDelta = np.var(Delta, axis=0)
+
+    gr0_mean = np.mean(gr0, axis=0)
+    cov0 = np.mean(gr0 * Delta, axis=0) - (meanDelta * gr0_mean)
+
+    lambda0 =  - cov0 / varDelta
+    grOpt = (1- lambda0) * gr0 + ( lambda0 )* grInf
+
+    # plt.plot(np.var(grOpt, axis=0), label='Variance of g(r)')
+    # plt.xlabel('Distance (r)')
+    # plt.ylabel('Variance')
+    # plt.title('Variance of g(r)')
+    # plt.legend()
+    # plt.grid()
+    # plt.show()
+    
+    return np.mean(grOpt, axis=0)
+
 def main():
     # Example usage
     box_length = 60.0
@@ -235,50 +308,45 @@ def main():
         for i in ordered_indices
         if os.path.exists(f"{configs_path}_{i}.npy")
     ]
-    print(f"Evaluating Borgis g(r) for {len(config_files)} files...")
+    
 
-    pot_length = int((max_radius - min_radius) / bin_width)
-
-    # Warm up compilation with the first configuration file
-    _ = cmpt_borgis_from_file(config_files[0], box_length, min_radius, bin_width, pot_length, x_current, x_low, x_cut, method)
-
+    num_bins = int((max_radius - min_radius) / bin_width)
     
     config = np.load(config_files[0])
     N, dimensions = config.shape
     prefactor = 2 *np.pi * N**2 / box_length**2 /4
 
+    print("Warm up compilation\n")
+    _ = cmpt_borgis_from_file(config_files[0], box_length, min_radius, bin_width, num_bins, x_current, x_low, x_cut, 'in')
 
-    # Parallel computation using multiprocessing
-    with Pool(NUM_THREADS) as pool:
-        borgis_results = list(
-            tqdm(
-                pool.imap(partial(cmpt_borgis_from_file,
-                        box_length=box_length,
-                        min_radius=min_radius,
-                        bin_width=bin_width,
-                        num_bins=pot_length,
-                        force_bins=x_current,
-                        rlow=x_low,
-                        r_cut=x_cut,
-                        method=method),
-                    config_files),
-                total=len(config_files),
-                desc="Processing configurations"
-            )
-        )
 
-    # Compute and return the mean g(r)
+    start_time = time.time()
+    gr_parallel = gBorgis_parallel(box_length, x_current, x_low, max_radius, bin_width, x_cut, method, min_radius=min_radius,
+    configs_path=configs_path, ordered_indices_file=ordered_indices_file, max_config_nb=max_config_nb)
+
     if method == 'out':
-        gr = 1 - np.mean(borgis_results, axis=0)/prefactor
-    if method == 'in':
-        gr = np.mean(borgis_results, axis=0)/prefactor
+        gr_parallel = 1 - gr_parallel/prefactor
+    else:
+        gr_parallel = gr_parallel/prefactor
 
-    plt.plot( gr, label='g(r) Borgis')
+    end_time = time.time()
+    print(f"Time taken for parallel computation: {end_time - start_time:.2f} seconds")
+    
+    start_time = time.time()
+    gr_parallel_opt = gBorgis_parallel_variance(box_length, x_current, x_low, max_radius, bin_width, x_cut, prefactor,
+    configs_path=configs_path, ordered_indices_file=ordered_indices_file, max_config_nb=max_config_nb)
+    end_time = time.time()
+    print(f"Time taken for parallel computation with variance: {end_time - start_time:.2f} seconds")
+
+    #Plot the results
+    plt.figure(figsize=(8, 6))
+    plt.plot(np.arange(min_radius, max_radius, bin_width), gr_parallel, label=f'g(r) from Borgis {method}', color='blue')
+    plt.plot(np.arange(min_radius, max_radius, bin_width), gr_parallel_opt, label='g(r) from Borgis with variance', color='red')
     plt.xlabel('Distance (r)')
     plt.ylabel('g(r)')
-    plt.title(f'Borgis g(r) from method {method}')
-    plt.grid()
+    plt.title('Borgis g(r) with and without variance')
     plt.legend()
+    plt.grid()
     plt.show()
     return
 
