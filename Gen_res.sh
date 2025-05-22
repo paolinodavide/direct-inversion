@@ -12,6 +12,12 @@ python3 convert_json.py gr.json
 python3 convert_json.py pot.json
 python3 convert_json.py err.json
 
-python3 plot_results.py all
+
+if [ "$1" == "skip" ]; then
+    python3 plot_results.py err
+    python3 plot_results.py final
+else
+    python3 plot_results.py all
+fi
 
 cd ..
