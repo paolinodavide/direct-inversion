@@ -65,9 +65,9 @@ def plot_error(filetype):
         plt.show()
 
 
-def plot_final():
+def plot_final(savePlot=False):
     """Plot the final data for 'gr', 'pot', and 'forces'."""
-    plt.figure(figsize=(16, 9))
+    plt.figure(figsize=(16, 6))
     for i, (filetype, ylabel, title) in enumerate([('gr', 'g(r)', 'g(r)'),
                                                    ('pot', 'Potential', 'Potential'),
                                                    ('pot', 'Force', 'Force')], start=1):
@@ -98,14 +98,17 @@ def plot_final():
                          verticalalignment='top', bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5))
 
     plt.tight_layout()
+    if savePlot:
+        plt.savefig('final_results.svg', format='svg')
     plt.show()
 
 
 def main():
     try:
         filetype = sys.argv[1]
-    except IndexError:
-        print("Enter the name of the file to parse")
+        savePlot = True if len(sys.argv) > 2 else False
+    except IndexError:  
+        print("Usage: python plot_results.py <filetype> [savePlot]")
         return
 
     column_index = 1
@@ -125,7 +128,7 @@ def main():
         process_files('pot', 1, 'Potential', 'Potential')
         process_files('pot', 2, 'Forces', 'Force')
         plot_error('err')
-        plot_final()
+        plot_final(savePlot)
 
 
 if __name__ == "__main__":
