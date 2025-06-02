@@ -100,13 +100,14 @@ def plot_final(savePlot=False):
     plt.tight_layout()
     if savePlot:
         plt.savefig('final_results.svg', format='svg')
+        print("Final results saved as 'final_results.svg'")
     plt.show()
 
 
 def main():
     try:
         filetype = sys.argv[1]
-        savePlot = True if len(sys.argv) > 2 else False
+        savePlot = True if len(sys.argv) > 1 else False
     except IndexError:  
         print("Usage: python plot_results.py <filetype> [savePlot]")
         return
@@ -122,7 +123,7 @@ def main():
     elif filetype == 'err':
         plot_error(filetype)
     elif filetype == 'final':
-        plot_final()
+        plot_final(savePlot)
     elif filetype == 'all':
         process_files('gr', 1, 'g(r)', 'g(r)')
         process_files('pot', 1, 'Potential', 'Potential')
@@ -133,5 +134,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
