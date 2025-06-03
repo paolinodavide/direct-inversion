@@ -88,6 +88,14 @@ cpdef double[:] get_pot(str name, int pot_length, double r_bin, double x_min, do
 		for i in range(0, pot_length):
 			pot_list[i] -= offset
 		return pot_list
+	elif (name == 'sh'):
+		for i in range(0, pot_length):
+			x = x_min + i*r_bin
+			pot_list[i] = 1./T*( x**(-14) + 1/2 * (1-np.tanh(10*(x-2.5))))
+		offset = pot_list[pot_length - 1]
+		for i in range(0, pot_length):
+			pot_list[i] -= offset
+		return pot_list
 	else:
 		print("Unknown potential name: ", name)
 	return pot_list
