@@ -99,8 +99,8 @@ def plot_final(savePlot=False):
 
     plt.tight_layout()
     if savePlot:
-        plt.savefig('final_results.svg', format='svg')
-        print("Final results saved as 'final_results.svg'")
+        plt.savefig('final_results.pdf', format='pdf')
+        print("Final results saved as 'final_results.pdf'")
     plt.show()
 
 
