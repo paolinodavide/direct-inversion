@@ -33,7 +33,7 @@ def process_files(filetype, column_index, plot_title, ylabel):
             positions = data[:, 0]
             y_data = data[:, column_index]
             plot_data(positions, y_data, f"{plot_title} vs Positions", r"$r / \sigma$", ylabel, label=file)
-    plt.savefig(f"{filetype}.svg", format="svg")
+    plt.savefig(f"{filetype}.pdf", format="pdf")
     plt.show()
 
 
@@ -61,53 +61,56 @@ def plot_error(filetype):
         plt.legend()
 
         plt.tight_layout()
-        plt.savefig(f"{filetype}.svg", format="svg")
+        plt.savefig(f"{filetype}.pdf", format="pdf")
         plt.show()
 
 
 def plot_final(savePlot=False):
     """Plot the final data for 'gr', 'pot', and 'forces'."""
-    plt.figure(figsize=(16, 6))
+    plt.figure(figsize=(8, 4))
     for i, (filetype, ylabel, title) in enumerate([('gr', 'g(r)', 'g(r)'),
-                                                   ('pot', 'Potential', 'Potential'),
-                                                   ('pot', 'Force', 'Force')], start=1):
+                                                   ('pot', r'$U(r) / \epsilon$', 'Potential'),
+                                                   ('pot', r'$F(r) / \epsilon \sigma$', 'Force')], start=1):
         plt.subplot(1, 3, i)
         files = glob.glob(f"{filetype}_*.dat")
         files = [file for file in files if file.split('_')[-1].split('.')[0].isdigit()]
         files = sorted(files, key=lambda x: int(x.split('_')[-1].split('.')[0]), reverse=True)[:1]
         target_file = f"{filetype}_target.dat"
-        
+        if filetype != 'gr':
+            plt.xticks = [1, 2, 2.5]
+        else:
+            plt.xticks = [2, 4, 6, 8, 10]
+
+                        # Target data
+
         # Converged results
         data = load_data(files[-1])
         if data is not None:
             positions = data[:, 0]
-            y_data = data[:, 1] if ylabel != 'Force' else data[:, 2]
-            plot_data(positions, y_data, f"{title} vs Positions", r"$r/\sigma$", ylabel, label=files[-1], style='o')
+            y_data = data[:, 1] if title != 'Force' else data[:, 2]
+            plt.plot(positions, y_data, 'o', label=f'iteration {files[-1].split('_')[-1].split('.')[0]}', color='C1', alpha=0.7, markerfacecolor='None')
+            plt.xlabel(r"$r/\sigma$")
+            plt.ylabel(ylabel)
+            
 
-        # Target data
         target_data = load_data(target_file)
         if target_data is not None:
             target_positions = target_data[:, 0]
-            target_y_data = target_data[:, 1] if ylabel != 'Force' else target_data[:, 2]
-            plot_data(target_positions, target_y_data, f"{title} vs Positions", r"$r/\sigma$", ylabel, label=target_file, style='--')
-            if ylabel != 'g(r)':
-                MSE = np.linalg.norm(target_y_data - y_data)**2 / len(target_y_data)
-                SNR = 10 * np.log10(np.sum(target_y_data**2) / np.sum((target_y_data - y_data)**2))
-                plt.text(0.05, 0.95, f"MSE: {MSE:.4e}\nSNR: {SNR:.2f} dB", 
-                         transform=plt.gca().transAxes, fontsize=10, 
-                         verticalalignment='top', bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5))
+            target_y_data = target_data[:, 1] if title != 'Force' else target_data[:, 2]
+            plt.plot(target_positions, target_y_data, label=f'Target ', color='black', linewidth=1)
+    plt.legend()
 
     plt.tight_layout()
     if savePlot:
         plt.savefig('final_results.pdf', format='pdf')
-        print("Final results saved as 'final_results.pdf'")
+        print("Final results saved as 'final_results.svg'")
     plt.show()
 
 
 def main():
     try:
         filetype = sys.argv[1]
-        savePlot = True if len(sys.argv) > 1 else False
+        savePlot = True if len(sys.argv) > 2 else False
     except IndexError:  
         print("Usage: python plot_results.py <filetype> [savePlot]")
         return
