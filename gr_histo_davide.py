@@ -36,7 +36,7 @@ def rdf_from_file(filename, dr, r_max=10):
 
         # Save results
         file_num = os.path.basename(filename).split('_')[1].split('.')[0]
-        output_folder = './rdfs/'
+        output_folder = 'outputs/rdfs/'
         os.makedirs(output_folder, exist_ok=True)
         
         output_filename = f'{output_folder}/g_r_lj_{file_num}.dat'
@@ -142,7 +142,11 @@ def main():
         sys.exit(1)
     
     # Find all files to process
-    files = find_lj_config_files()
+    inputs_path = "./inputs/"
+    output_path = "./outputs/"
+    os.makedirs(output_path, exist_ok=True)
+    os.makedirs(output_path+'/rdfs/', exist_ok=True)
+    files = find_lj_config_files(inputs_path+"configs/")
     if not files:
         print("No LJ config files found in ./configs/")
         return
@@ -164,7 +168,8 @@ def main():
         r = valid_results[0][1]
         
         # Save combined RDF
-        np.savetxt('./rdfs/g_r_h_avg.dat', 
+
+        np.savetxt(output_path+'/rdfs/g_r_h_avg.dat', 
                   np.column_stack((r, g_total, var_g)),
                   header='# r g(r) var_g(r)')
         print("All files processed successfully")
@@ -174,14 +179,12 @@ def main():
 
 
     plt.figure(figsize=(8, 6))
-    plt.scatter(r, g_total, s=10, color='blue', label='g(r)')
-    plt.xlabel('r', fontsize=14)
+    plt.scatter(r, g_total, s=10, label='g(r)')
+    plt.xlabel(r'$r/\sigma$', fontsize=14)
     plt.ylabel('g(r)', fontsize=14)
     plt.title('Radial Distribution Function', fontsize=16)
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.legend(fontsize=12)
     plt.tight_layout()
-    plt.savefig('./rdfs/g_r_total_plot.png', dpi=300)
+    plt.savefig(output_path + '/rdfs/00gr_histo.pdf', dpi=300)
     plt.show()
 
 if __name__ == '__main__':

@@ -1,37 +1,64 @@
 # 🥊 Force IBI Project
 
-This project implements Iterative Boltzmann Inversion (IBI) and related coarse-grained force field optimization techniques. The code is modular and optimized for Python with optional Cython acceleration.
+This project implements Iterative Boltzmann Inversion (IBI) and related coarse-grained force field optimization techniques. The code has been updated to use Julia as the main computation engine for better performance, while maintaining Python for pre/post-processing.
 
 > ⚠️ **Note:** This repository is for personal use. Dependencies and environment setup are assumed to be manually managed.  
 ---
-## ⚙️ Usage Guide
-> 🧵 All steps assume execution from within the `forceIBI/` directory.
-### 1. Compile Cython Extensions
+# ⚙️ Usage Guide
+## Quick Start for Main Inversion
+
+If you're already familiar with the setup process, you can jump directly to running the main inversion routine:
+
+1. Ensure your parameter file `./inputs/params.json` is properly configured.
+2. Execute the following command from the project root:
+    ```bash
+    julia -t auto forceIBI/grinter_parallel.jl
+    ```
+3. The results will be saved in the `./outputs/` directory for further analysis.
+
+For detailed steps, refer to the sections below.
+## Full Workflow
+### 1. Prepare Input Configurations
+Place your configuration files in the `./inputs/configs/` directory. These files will serve as the starting point for the inversion process.
+
+### 2. Generate Targets for Inversion
+Run the following scripts from the project root to prepare the target data for the inversion:
+
+1. Minimize the input data:
+    ```bash
+    python3 forceIBI/min_d.py
+    ```
+
+2. Create histograms for the radial distribution function (RDF):
+    ```bash
+    python3 forceIBI/gr_histo.py <dr>
+    ```
+    Replace `<dr>` with the desired bin width for the RDF.
+
+3. Generate weighted target data:
+    ```bash
+    python3 forceIBI/weighted_gen_target.py
+    ```
+
+4. Create a dummy `.json` parameter file:
+    ```bash
+    python3 init_dummy_json.py
+    ```
+
+### 3. Run the Main Computation
+Edit the parameter file `./inputs/paramters.json`. 
+Execute the main iterative Boltzmann inversion routine using Julia:
 ```bash
-python3 setup.py build_ext --inplace
+julia -t auto forceIBI/grinter_parallel.jl
 ```
-### 2. Set Number of Threads
-Edit the file `forceIBI/gr_borgis.py` and set the number of cores (recommended: 8): 
-```python
-NUM_THREADS = 8  # Example
-```
-### 3. Prepare Configuration Module
-Ensure that the system configuration files are correctly compiled in `.npy` format.
-Edit your parameters file and generate the dictionary:
+This will perform the coarse-grained force field optimization.
+
+### 4. Analyze and Visualize Results
+To plot and analyze the results, run:
 ```bash
-python3 make_config_iter.py
+python3 forceIBI/plot_results.py
 ```
-### 4. Run Main Computation
-Execute the main routine:
-```bash
-python3 grinter_parallel.py
-```
-### 5. Generate and Parse Results
-To organize and analyze the output:
-```bash
-bash Gen_res.sh
-```
-Results will be saved automatically in the `Results/` directory. 
+The generated plots and data will be saved automatically in the `./outputs/` directory.
 
 ---
 
@@ -39,24 +66,17 @@ Results will be saved automatically in the `Results/` directory.
 ```
 project-root/
 ├── forceIBI/                # Core scripts and modules
-│   ├── gr_borgis.py         # Contains the main function for Borgis Formula implementation
-│   ├── grinter_parallel.py  # Contains the main potential convergence loop
-│   ├── *.py                 # Python scripts
-│   ├── *.pyx                # Cython code
-│   ├── *.cpp                # (Deprecated) C++ scripts
-│   ├── *.sh                 # Utility shell scripts
-│   ├── README.md            # This file
-│   └── utils/               # Utility modules
-│       └── *.py
-├── configs/                 # Input configuration folders (e.g., config_iter_0)
-├── configs_npy/             # Serialized config data (NumPy)
-└── Results/                 # Output directory (auto-generated)
+│   ├── gr_borgis.jl         # Contains the main function for Borgis Formula implementation
+│   ├── grinter_parallel.jl  # Contains the main potential convergence loop
+│   ├── utils.jl             # Auxiliary functions for the inversion loop
+|   ├── ...
+|   ├── *.py                 # All python files used for pre- and post-processing
+│   └── README.md            # This file
+|
+├── inputs/                  
+│   ├── configs/             # Where configurations should be stored
+│   ├── configs_bin/         # Auto-generated directory with binary-converted input files
+│   └── params.json          # Params for the inversion
+|
+└── outputs/                 # Output directory (auto-generated)
 ```
----
-## 📝 Notes
-- Do **not** place configuration folders inside subdirectories — they must be located directly in the project root.
-- The `gen_pos.py` script is now deprecated and no longer required.
-- The `format_data.py` script now also converts files from `.dat` to `.npy`. 
-- The `Results/` folder will be created automatically if it doesn't exist.
-- Target RDFs and waiting time lists should be saved in the `project-root` directory.
-- Cache is stored to improve performance; however, outdated caches might lead to ineffective runs. To address this, `grinter_parallel` includes a routine to reset the `forceIBI/__pycache__` directory at each run, clearing the cache. However, this may not always suffice. An additional run should resolve the issue in such cases.   

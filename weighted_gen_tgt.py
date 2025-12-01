@@ -40,8 +40,9 @@ def get_weights(r, gr):
     return weights
 
 def main():
-    r, g_r, var_g = np.loadtxt('./rdfs/g_r_h_avg.dat', unpack=True)
-    plt.plot(r, g_r, 'o', label='Histo RDF', markersize=3)
+    rdf_path = "outputs/rdfs/"
+    r, g_r, var_g = np.loadtxt(rdf_path+ 'g_r_h_avg.dat', unpack=True)
+    plt.semilogy(r, g_r, 'o', label='Histo RDF', markersize=3)
 
     try:
         r_old, gr_tgt_old = np.loadtxt('./gs_target.dat', unpack=True)
@@ -64,14 +65,15 @@ def main():
         print(f"\nWarning: g_smoothed has a minimum value of {g_min}, below the threshold.")
 
     radii = np.linspace(r[0], r[-1], 10_000)
-    plt.plot(radii, spline(radii), '--', label='Weighted Spline')
+    plt.semilogy(radii, spline(radii), '--', label='Weighted Spline')
     plt.xlabel('r')
     plt.ylabel('g(r)')
     plt.legend()
     plt.grid('--')
+    plt.savefig(rdf_path + '01_spline_gr.pdf', dpi=300)
     plt.show()
 
-    output_file = 'gr_weighted.dat'
+    output_file = 'inputs/gr_weighted.dat'
     np.savetxt(output_file, np.column_stack((r, spline(r))), delimiter='\t', header="# r\tg(r)", comments='')
     print(f"Weighted spline saved to {output_file}.")
 
