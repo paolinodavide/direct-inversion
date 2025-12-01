@@ -1,6 +1,6 @@
 # 🥊 Force IBI Project
 
-This project implements Iterative Boltzmann Inversion (IBI) and related coarse-grained force field optimization techniques. The code has been updated to use Julia as the main computation engine for better performance, while maintaining Python for pre/post-processing.
+This project implements Iterative Boltzmann Inversion (IBI) by exploiting the force formula proposed by Borgis et al. The code has been updated to use Julia as the main computation engine for better performance, while maintaining Python for pre/post-processing.
 
 > ⚠️ **Note:** This repository is for personal use. Dependencies and environment setup are assumed to be manually managed.  
 ---
@@ -51,7 +51,7 @@ Execute the main iterative Boltzmann inversion routine using Julia:
 ```bash
 julia -t auto forceIBI/grinter_parallel.jl
 ```
-This will perform the coarse-grained force field optimization.
+This will perform the effective potential reconstruction. 
 
 ### 4. Analyze and Visualize Results
 To plot and analyze the results, run:
@@ -67,7 +67,7 @@ The generated plots and data will be saved automatically in the `./outputs/` dir
 project-root/
 ├── forceIBI/                # Core scripts and modules
 │   ├── gr_borgis.jl         # Contains the main function for Borgis Formula implementation
-│   ├── grinter_parallel.jl  # Contains the main potential convergence loop
+│   ├── grinter_parallel.jl  # Contains the main potential inversion loop
 │   ├── utils.jl             # Auxiliary functions for the inversion loop
 |   ├── ...
 |   ├── *.py                 # All python files used for pre- and post-processing
