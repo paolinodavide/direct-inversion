@@ -97,17 +97,16 @@ function main()
         φ = (1.0 - delta_target) / (1.0 - delta_pot)
 
         # Rescale gr
-        gr_current_full = @. abs(gr_normalized * φ + 1.0 - φ)
-        gr_current = @view gr_current_full[binlow:binhigh]
+        gr_current = @view gr_normalized[binlow:binhigh]
         
         # Update potential
-        update_potential!(βu_current, gr_current, gr_target, learning_rate, φ)
+        update_potential!(βu_current, gr_current, gr_target, learning_rate)
         f_current = f_over_r_from_potential(βu_current, r_low, bin_width)
         
         # Check convergence
         error, iteration_diff = compute_convergence_metrics(gr_current, gr_target, gr_old)
         
-        @info "Iteration $iteration" error=error iteration_diff=iteration_diff
+        @info "Iteration $iteration" error=error iteration_diff=iteration_diff phi=φ
         
         # Save iteration data
         
@@ -126,10 +125,14 @@ function main()
 end
 
 
-function update_potential!(βu_current, gr_current, gr_target, learning_rate, φ; small_number::Float64=1e-10)
+function update_potential!(βu_current, gr_current, gr_target, learning_rate; small_number::Float64=1e-10)
 
-    @. βu_current += learning_rate * log((gr_current + small_number) / (gr_target + small_number))
+    φ = (gr_target[1]-1) / (gr_current[1]-1)
+    gr_current .= @. abs(φ * (gr_current -1)+1 )
+
+    @. βu_current += learning_rate * log(abs(gr_current + small_number) / (gr_target + small_number))
     βu_current .*= φ
+    # @. βu_current += learning_rate * (log(gr_current + small_number) - φ * log(gr_target + small_number))
     βu_current .-= βu_current[end]  
 end
 
@@ -144,7 +147,7 @@ function f_over_r_from_potential(potential::Vector{Float64}, r_low::Float64, bin
     pot_length = length(potential)
     f_over_r = similar(potential)
 
-    for i in 2:(pot_length - 1)
+    @inbounds for i in 2:(pot_length - 1)
         r = r_low + (i - 1) * bin_width
         f_over_r[i] = - (potential[i + 1] - potential[i - 1]) / (2.0 * bin_width * r)
     end
