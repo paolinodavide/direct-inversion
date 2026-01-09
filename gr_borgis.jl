@@ -1,5 +1,19 @@
 using LoopVectorization
 using StaticArrays
+using Revise
+
+@inline function wrap_pbc_distances(separation::Float64, box_length::Float64, inv_box_length::Float64)::Float64
+    """Apply minimum image convention for periodic boundary conditions."""
+    return separation - box_length * round(separation * inv_box_length)
+end
+
+@inline function pbc_distance(pos_i::SVector{D, Float64}, pos_j::SVector{D, Float64}, box_size::Float64) where D
+    """Compute the minimum image distance vector between two positions under PBC."""
+    distance = pos_i - pos_j
+    distance -= box_size * round.(distance / box_size)
+    return distance, dot(distance, distance)
+end
+
 
 """ 
 Compute g(r) using the Force prescription of Borgis et al.
@@ -8,6 +22,104 @@ Method specifyes the integration direction:
 - "out": integrate from infty inward
 - "both": return raw integrand
 """
+function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
+    box_length::Float64,
+    bin_width::Float64,
+    num_bins::Int,
+    force_over_r::Vector{Float64},
+    r_min::Float64,
+    r_cutoff::Float64,
+    method::String="out") where D
+    
+    num_particles, num_dimensions = size(particle_positions)
+    inv_bin_width = 1.0 / bin_width
+
+
+    positions = [SVector{D, Float64}(particle_positions'[:, i]) for i in 1:num_particles]
+    total_forces = [SVector{D, Float64}(zeros(num_dimensions)) for _ in 1:num_particles]
+    #println("Converted pos to SVectors")
+
+    @inbounds for i in 1:num_particles
+        pos_i = positions[i]
+
+        for j in i+1:num_particles
+            pos_j = positions[j]
+
+            rVec_ij, r2_ij= pbc_distance(pos_i, pos_j, box_length)
+            if r2_ij == 0.0 || r2_ij > r_cutoff^2
+                continue
+            end
+
+            r_ij = sqrt(r2_ij)
+
+
+            #f_magnitude::Float64 = 0.0
+            f_magnitude = if r_ij < r_min
+                force_over_r[1] + (r_ij - r_min) * inv_bin_width * (force_over_r[2] - force_over_r[1])
+            else
+                radial_bin_index = floor(Int, r_ij * inv_bin_width)
+                force_table_index = radial_bin_index - floor(Int, r_min * inv_bin_width) + 1
+                interpolation_weight = r_ij * inv_bin_width - radial_bin_index
+                (1.0 - interpolation_weight) * force_over_r[force_table_index] + interpolation_weight * force_over_r[force_table_index+1]
+            end
+
+            total_forces[i] += f_magnitude * rVec_ij
+            total_forces[j] -= f_magnitude * rVec_ij
+        end
+    end
+
+
+    borgis_contributions = zeros(Float64, num_bins)
+    @inbounds for i in 1:num_particles
+        pos_i = positions[i]
+        force_i = total_forces[i]
+
+        for j in i+1:num_particles
+            pos_j = positions[j]
+            force_j = total_forces[j]
+
+            rVec_ij, r2_ij= pbc_distance(pos_i, pos_j, box_length)
+            if iszero(r2_ij)
+                continue
+            end
+
+            r_ij = sqrt(r2_ij)
+            radial_bin_index = floor(Int, r_ij * inv_bin_width)
+            target_bin = clamp(radial_bin_index + 1, 1, num_bins)
+
+            force_diff = force_i - force_j
+            borgis_delta = if num_dimensions == 2
+                dot(force_diff, rVec_ij) / r2_ij
+            elseif num_dimensions == 3
+                dot(force_diff, rVec_ij) / (r2_ij * r_ij)
+            else
+                dot(force_diff, rVec_ij) / r_ij^num_dimensions
+            end
+
+            borgis_contributions[target_bin] += borgis_delta
+        end
+    end
+
+    # Phase 3: Compute cumulative integral based on method
+    if method == "in"
+        # Cumulative integral from r_min outward
+        cumsum!(borgis_contributions, borgis_contributions)
+        return borgis_contributions
+    elseif method == "out"
+        # Cumulative integral from r_cutoff inward  
+        reverse!(borgis_contributions)
+        cumsum!(borgis_contributions, borgis_contributions)
+        reverse!(borgis_contributions)
+        return borgis_contributions
+    elseif method == "both"
+        # Return the raw integrand
+        return borgis_contributions
+    else
+        throw(ArgumentError("Invalid integration method. Choose 'in', 'out', or 'both'."))
+    end
+end
+
+
 function grForce_notNorm(particle_positions::Matrix{Float64},
     box_length::Float64,
     bin_width::Float64,
@@ -40,7 +152,7 @@ function grForce_notNorm(particle_positions::Matrix{Float64},
             separation_squared = 0.0
             @simd for dim in 1:num_dimensions
                 displacement = position_i[dim] - position_j[dim]
-                displacement -= box_length * round(displacement * inv_box_length)
+                displacement = wrap_pbc_distances(displacement, box_length, inv_box_length)
                 separation_squared += displacement * displacement
             end
 
@@ -65,7 +177,7 @@ function grForce_notNorm(particle_positions::Matrix{Float64},
             # Apply forces to both particles (Newton's 3rd law)
             @simd for dim in 1:num_dimensions
                 displacement = position_i[dim] - position_j[dim]
-                displacement -= box_length * round(displacement * inv_box_length)
+                displacement = wrap_pbc_distances(displacement, box_length, inv_box_length)
                 total_forces[particle_i, dim] += force_magnitude * displacement
                 total_forces[particle_j, dim] -= force_magnitude * displacement
             end
@@ -87,7 +199,7 @@ function grForce_notNorm(particle_positions::Matrix{Float64},
 
             @simd for dim in 1:num_dimensions
                 displacement = position_i[dim] - position_j[dim]
-                displacement -= box_length * round(displacement * inv_box_length)
+                displacement = wrap_pbc_distances(displacement, box_length, inv_box_length)
                 separation_squared += displacement * displacement
 
                 # Compute relative force difference
@@ -208,7 +320,7 @@ function gr_force_from_dir(directory::String, box_length::Float64, r_bin::Float6
 
                 particle_positions = read_particle_positions(filepath)
 
-                borgis_gr_unnormalized = grForce_notNorm(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
+                borgis_gr_unnormalized = grForce_notNorm_svectorized(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
 
                 borgis_gr_total .+= borgis_gr_unnormalized
                 file_count += 1
@@ -250,7 +362,7 @@ function gr_force_from_dir_parallel(directory::String, box_length::Float64, r_bi
     # Process files in parallel
     results = ThreadsX.map(file_paths) do filepath
         particle_positions = read_particle_positions(filepath)
-        grForce_notNorm(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
+        grForce_notNorm_svectorized(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
     end
 
     # Combine results
@@ -323,11 +435,11 @@ function gr_force_from_dir_parallel_binary(directory::String, box_length::Float6
     # Collect all binary file paths
     file_paths = String[]
     for (root, dirs, files) in walkdir(directory)
-    for file in files
-    if endswith(file, ".bin")  # Now looking for binary files
-    push!(file_paths, joinpath(root, file))
-    end
-    end
+        for file in files
+            if endswith(file, ".bin")  # Now looking for binary files
+            push!(file_paths, joinpath(root, file))
+            end
+        end
     end
 
     if isempty(file_paths)
@@ -337,7 +449,7 @@ function gr_force_from_dir_parallel_binary(directory::String, box_length::Float6
     # Process files in parallel with binary reader
     results = ThreadsX.map(file_paths) do filepath
     particle_positions = read_particle_positions_binary(filepath)  # or mmap version
-    grForce_notNorm(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
+    grForce_notNorm_svectorized(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
     end
 
     # Combine results (same as before)
@@ -380,7 +492,7 @@ function main()
 
     # Read particle positions
     #directory = "/home/davide/OneDrive/ESPCI/Science/Nov25/Inversion_Julia/configs/"
-    directory = "/home/davide/OneDrive/POLITO/Magistrale/Internship/W7/lj_56x60_1/configs/"
+    directory = "/home/davide/OneDrive/ESPCI/Science/2511-Nov25/Inversion_Julia/lj_56x60_1/inputs/configs"
     filename = "lj_10000.dat"  # Example file to get number of particles
     particle_positions = read_particle_positions(joinpath(directory, filename))
     num_particles, dimensions = size(particle_positions)
@@ -390,8 +502,8 @@ function main()
 
 
     # Precompute force_div_r for bins
-    # println("Computing Lennard-Jones force...")
-    # force_div_r = compute_force_div_r_bins(r_bin, num_bins, rlow, epsilon, sigma, r_cut)
+    println("Computing Lennard-Jones force...")
+    force_div_r = compute_force_div_r_bins(r_bin, num_bins, rlow, epsilon, sigma, r_cut)
     # # output forces
     # forces_filename = "forces_julia.dat"
     # open(forces_filename, "w") do file
@@ -402,9 +514,7 @@ function main()
     #     end
     # end
     # println("Lennard-Jones forces written to $forces_filename")
-    println("Reading precomputed forces from forces_python.dat...")
-    force_data = readdlm("forces_python.dat", comments=true)
-    force_div_r = force_data[:, 2]
+
     prefactor = (2 * π * num_particles^2) / (box_length^dimensions) / 4
 
 
@@ -420,10 +530,28 @@ function main()
         endtime = time()
         println("g(r) computation from binary files completed in $(endtime - start_time) seconds.")
 
-        if !all(isapprox.(borgis_gr_unnormalized, borgis_gr_unnormalized_bin; atol=1e-8))
+        if !all(isapprox.(borgis_gr_unnormalized, borgis_gr_unnormalized_bin; atol=1e-12))
             println("Warning: Results from ASCII and binary files do not match!")
+
+            plot(1:num_bins, borgis_gr_unnormalized, label="ASCII", xlabel="Bin Index", ylabel="Borgis g(r) unnormalized", title="Borgis g(r) Comparison")
+            plot!(1:num_bins, borgis_gr_unnormalized_bin, label="Binary")
+            savefig("gr_comparison_plot.png")   
+
+            plot(1:num_bins, abs.(borgis_gr_unnormalized .- borgis_gr_unnormalized_bin), label="Difference", xlabel="Bin Index", ylabel="Absolute Difference", title="Difference between ASCII and Binary g(r)")
+            savefig("gr_difference_plot.png")
+
+            #println(borgis_gr_unnormalized - borgis_gr_unnormalized_bin)
+
+            max_diff = maximum(abs.(borgis_gr_unnormalized .- borgis_gr_unnormalized_bin))
+
+            if max_diff > 1e-10
+                println("Warning: Significant mismatch found! Max diff: ", max_diff)
+                # ... plotting code ...
+            end
         end
         # Normalize to get proper g(r)
+
+
         
 
         if method == "out"
@@ -458,6 +586,9 @@ function main()
         println("Error: $e")
         println("Make sure the file $filename exists and has the correct format")
     end
+
+    println("Verifying binary file reader...")
+    borgis_gr_unnormalized_bin, variance_bin = gr_force_from_dir_parallel_binary(directory, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
 end
 
 # Example function to generate test data
