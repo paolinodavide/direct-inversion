@@ -22,7 +22,7 @@ function main()
     bin_width = params["bin_width"]::Float64
     binlow = Int(floor(r_low / bin_width)) + 1
     binhigh = Int(floor(r_high / bin_width)) + 1
-    max_distance = 2 * r_high
+    max_distance = 4 * r_high
     num_bins = Int(floor(max_distance / bin_width))
 
     # File paths
@@ -40,6 +40,9 @@ function main()
     convergence_tol = params["target_precision"]::Float64
     method_force_formula = params["method_force_formula"]::String
 
+    # Create output directory
+    mkpath("outputs")
+
     # Load target data
     data = readdlm(joinpath(path_target, target_file), comments=true)
     r_values, full_target_gr = data[:, 1], data[:, 2]
@@ -48,6 +51,9 @@ function main()
     if length(r_range) != length(r_values[binlow:binhigh])
         binhigh = binlow + length(r_range) - 1
     end
+    r_range
+    save_gr_data(r_values, full_target_gr, "gr_target.dat")
+
     gr_target = @view full_target_gr[binlow:binhigh]
     gr_current = copy(gr_target)
     
@@ -64,9 +70,7 @@ function main()
 
     # Handle binary configuration files
     config_dir = ensure_binary_configs(config_dir, wt_file_path, number_config)
-    
-    # Create output directory
-    mkpath("outputs")
+
     
     # Precompute constants
     prefactor = compute_prefactor(N_particles, L_box, dimensions)
@@ -81,7 +85,7 @@ function main()
     for iteration in 0:max_iter
         gr_old = copy(gr_current)
         
-        # Compute radial distribution function
+        # βu_t → gr_t
         gr_notNorm, _ = gr_force_from_dir_parallel_binary(
             config_dir, L_box, bin_width, num_bins, 
             f_current, r_low, r_high, method_force_formula
@@ -98,25 +102,26 @@ function main()
 
         # Rescale gr
         gr_current = @view gr_normalized[binlow:binhigh]
-        
-        # Update potential
-        update_potential!(βu_current, gr_current, gr_target, learning_rate)
-        f_current = f_over_r_from_potential(βu_current, r_low, bin_width)
-        
+        save_iteration_data(iteration, r_range, gr_current, βu_current, f_current)
+
         # Check convergence
         error, iteration_diff = compute_convergence_metrics(gr_current, gr_target, gr_old)
         
         @info "Iteration $iteration" error=error iteration_diff=iteration_diff phi=φ
         
-        # Save iteration data
-        
-        save_iteration_data(iteration, r_range, gr_current, βu_current, f_current)
+        # Save iteration data      
         append_convergence_data(convergence_file, iteration, time() - start_time, error, iteration_diff, delta_target, φ)
         
         if error < convergence_tol || iteration_diff < convergence_tol
             @info "Convergence achieved" iteration=iteration
+
+            save_gr_data(r_values, gr_normalized, "gr_final.dat")
             break
         end
+
+        # u_t → u_t+1
+        update_potential!(βu_current, gr_current, gr_target, learning_rate)
+        f_current = f_over_r_from_potential(βu_current, r_low, bin_width)
     end
     
     # Save final target data
@@ -137,8 +142,8 @@ function update_potential!(βu_current, gr_current, gr_target, learning_rate; sm
 end
 
 function compute_convergence_metrics(gr_current, gr_target, gr_old)
-    error = sqrt(sum((gr_current .- gr_target).^2) )
-    iteration_diff = sqrt(sum((gr_current .- gr_old).^2)) 
+    error = sum((gr_current .- gr_target).^2) / length(gr_target)
+    iteration_diff = sum((gr_current .- gr_old).^2) / length(gr_current)
     return error, iteration_diff
 end
 

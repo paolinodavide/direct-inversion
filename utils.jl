@@ -95,6 +95,14 @@ function save_target_data(r_range, gr_target, βu_target, f_target)
     end
 end
 
+function save_gr_data(r_range, gr_data, filename)
+    output_data = hcat(collect(r_range), gr_data)
+    open("outputs/$filename", "w") do io
+        write(io, "# r\tgr\n")
+        writedlm(io, output_data)
+    end
+end
+
 # Helper functions for better organization
 function ensure_binary_configs(config_dir, wt_file_path, number_config)
     if !any(endswith.(readdir(config_dir), ".bin"))

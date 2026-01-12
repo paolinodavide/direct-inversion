@@ -12,11 +12,12 @@ files = [f for f in os.listdir(Path) if f.startswith(iterations_prefix)]
 fig, axs = plt.subplots(1, 3, figsize=(18, 6))  # Create a single figure with 3 horizontal subplots
 
 files = sorted(files, key=lambda x: float(x.split('_')[1].split('.')[0]) if x.split('_')[1].split('.')[0].lstrip('-').isdigit() else float('inf'))
+print("Sorted files:", files)
 for i, file in enumerate(files):
     radii, gr, pot, forces = np.loadtxt(os.path.join(Path, file), unpack=True)
 
-    axs[0].plot(radii, gr, label=f'{i}')
-    axs[1].plot(radii, pot, label=f'{i}')
+    axs[0].plot(radii, gr, label=f'{i-1}')
+    axs[1].plot(radii, pot, label=f'{i-1}')
 
 # Configure the first subplot for g(r)
 axs[0].set_title('g(r)')
