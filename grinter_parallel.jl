@@ -22,7 +22,7 @@ function main()
     bin_width = params["bin_width"]::Float64
     binlow = Int(floor(r_low / bin_width)) + 1
     binhigh = Int(floor(r_high / bin_width)) + 1
-    max_distance = 4 * r_high
+    max_distance = 10.0
     num_bins = Int(floor(max_distance / bin_width))
 
     # File paths
@@ -66,6 +66,7 @@ function main()
     else
         get_potential_from_name(initial_pot, T, r_low, r_high, bin_width)
     end
+    βu_current .-= βu_current[end]
     f_current = f_over_r_from_potential(βu_current, r_low, bin_width)
 
     # Handle binary configuration files
@@ -135,9 +136,9 @@ function update_potential!(βu_current, gr_current, gr_target, learning_rate; sm
     φ = (gr_target[1]-1) / (gr_current[1]-1)
     gr_current .= @. abs(φ * (gr_current -1)+1 )
 
-    @. βu_current += learning_rate * log(abs(gr_current + small_number) / (gr_target + small_number))
-    βu_current .*= φ
-    # @. βu_current += learning_rate * (log(gr_current + small_number) - φ * log(gr_target + small_number))
+    # @. βu_current += learning_rate * log(abs(gr_current + small_number) / (gr_target + small_number))
+    # βu_current .*= φ
+    @. βu_current += learning_rate * (log(gr_current + small_number) - φ * log(gr_target + small_number))
     βu_current .-= βu_current[end]  
 end
 
