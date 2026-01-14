@@ -62,7 +62,7 @@ function main()
     f_target = f_over_r_from_potential(βu_target, r_low, bin_width)
     
     βu_current = if initial_pot == "mean_force"
-        - log.(gr_target)
+        - log.(abs.(gr_target))
     else
         get_potential_from_name(initial_pot, T, r_low, r_high, bin_width)
     end
@@ -135,8 +135,7 @@ end
 function update_potential!(βu_current, gr_current, gr_target, learning_rate; small_number::Float64=1e-10)
 
     φ = (gr_target[1]-1) / (gr_current[1]-1)
-    #gr_current .= max.(gr_current, small_number)
-    gr_current .= @. φ * ((gr_current) - 1) + 1
+    gr_current .= @. abs(φ * (gr_current -1)+1 )
 
     # @. βu_current += learning_rate * log(abs(gr_current + small_number) / (gr_target + small_number))
     # βu_current .*= φ
