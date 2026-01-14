@@ -127,7 +127,7 @@ function main()
     
     # Save final target data
     save_target_data(r_range, gr_target, βu_target, f_target)
-    cp("inputs/params.json", "outputs/params.json")
+    cp("inputs/params.json", "outputs/00params.json")
     @info "Optimization completed in $(time() - start_time) seconds"
 end
 
