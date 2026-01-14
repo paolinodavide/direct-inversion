@@ -135,7 +135,8 @@ end
 function update_potential!(βu_current, gr_current, gr_target, learning_rate; small_number::Float64=1e-10)
 
     φ = (gr_target[1]-1) / (gr_current[1]-1)
-    gr_current .= @. abs(φ * (gr_current -1)+1 )
+    #gr_current .= max.(gr_current, small_number)
+    gr_current .= @. φ * ((gr_current) - 1) + 1
 
     # @. βu_current += learning_rate * log(abs(gr_current + small_number) / (gr_target + small_number))
     # βu_current .*= φ
