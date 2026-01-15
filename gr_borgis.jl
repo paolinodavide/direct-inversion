@@ -474,147 +474,63 @@ function compute_prefactor(N_particles, box_length, dimension)
     end
 end
 
+using JSON
 
 function main()
-    # Simulation parameters
-    epsilon = 1.0      # LJ energy parameter
-    sigma = 1.0        # LJ size parameter
-    r_cut = 2.5 * sigma  # Cutoff distance
-    box_length = 60.0  # Box size (assumed cubic)
-    method = "both"
+    dummy_params = Dict(
+        "directory" => "inputs",
+        "box_length" => 10.0,
+        "r_bin" => 0.01,
+        "num_bins" => 1000,
+        "r_low" => 0.1,
+        "r_cut" => 5.0,
+        "epsilon" => 1.0,
+        "sigma" => 1.0,
+        "method" => "out"
+    )
 
-    # Binning parameters
-    rlow = 0.90         # Minimum distance
-    rmax = 10  # Maximum distance (half box due to periodic BC)
-    r_bin = 0.002
-    pot_length = Int(floor((r_cut - rlow) / r_bin))
-    num_bins = Int(floor((rmax - 0.0) / r_bin))
+    params = JSON.parsefile(joinpath(dummy_params["directory"], "params.json"))
 
-    # Read particle positions
-    #directory = "/home/davide/OneDrive/ESPCI/Science/Nov25/Inversion_Julia/configs/"
-    directory = "/home/davide/OneDrive/ESPCI/Science/2511-Nov25/Inversion_Julia/lj_56x60_1/inputs/configs"
-    filename = "lj_10000.dat"  # Example file to get number of particles
-    particle_positions = read_particle_positions(joinpath(directory, filename))
-    num_particles, dimensions = size(particle_positions)
+    N = params["N_particles"]
+    L_box = params["L_box"]    
+    r_bin = params["bin_width"]
+    r_low = params["r_low"]
+    r_cut = params["r_high"]
+    epsilon = dummy_params["epsilon"]
+    sigma = dummy_params["sigma"]
+    method = params["method_force_formula"]
+    T = params["Temperature"]
+    dimension = params["dimensions"]
 
-    #convert_to_binary(directory, directory * "_bin")
-    
+    num_bins = params["qdim_max"]
 
-
-    # Precompute force_div_r for bins
-    println("Computing Lennard-Jones force...")
-    force_div_r = compute_force_div_r_bins(r_bin, num_bins, rlow, epsilon, sigma, r_cut)
-    # # output forces
-    # forces_filename = "forces_julia.dat"
-    # open(forces_filename, "w") do file
-    #     println(file, "# r\tF(r)/r")
-    #     for bin_idx in 1:num_bins
-    #         r = rlow + (bin_idx - 0.5) * r_bin  # bin center
-    #         println(file, "$(r)\t$(force_div_r[bin_idx])")
-    #     end
-    # end
-    # println("Lennard-Jones forces written to $forces_filename")
-
-    prefactor = (2 * π * num_particles^2) / (box_length^dimensions) / 4
+    config_dir_binary = joinpath(dummy_params["directory"], "configs_bin")
 
 
-    try
-        start_time = time()
-        borgis_gr_unnormalized, variance = gr_force_from_dir_parallel(directory, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
-        endtime = time()
-        println("g(r) computation completed in $(endtime - start_time) seconds.")
+    # Calculation
 
-        start_time = time()
-        directory = directory * "_bin"
-        borgis_gr_unnormalized_bin, variance_bin = gr_force_from_dir_parallel_binary(directory, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
-        endtime = time()
-        println("g(r) computation from binary files completed in $(endtime - start_time) seconds.")
+    force_div_r = compute_force_div_r_bins(r_bin, num_bins, r_low, epsilon, sigma, r_cut)
 
-        if !all(isapprox.(borgis_gr_unnormalized, borgis_gr_unnormalized_bin; atol=1e-12))
-            println("Warning: Results from ASCII and binary files do not match!")
+    borgis_gr_average, variance = gr_force_from_dir_parallel_binary(
+        config_dir_binary, L_box, r_bin, num_bins, force_div_r, r_low, r_cut, method
+    )
 
-            plot(1:num_bins, borgis_gr_unnormalized, label="ASCII", xlabel="Bin Index", ylabel="Borgis g(r) unnormalized", title="Borgis g(r) Comparison")
-            plot!(1:num_bins, borgis_gr_unnormalized_bin, label="Binary")
-            savefig("gr_comparison_plot.png")   
-
-            plot(1:num_bins, abs.(borgis_gr_unnormalized .- borgis_gr_unnormalized_bin), label="Difference", xlabel="Bin Index", ylabel="Absolute Difference", title="Difference between ASCII and Binary g(r)")
-            savefig("gr_difference_plot.png")
-
-            #println(borgis_gr_unnormalized - borgis_gr_unnormalized_bin)
-
-            max_diff = maximum(abs.(borgis_gr_unnormalized .- borgis_gr_unnormalized_bin))
-
-            if max_diff > 1e-10
-                println("Warning: Significant mismatch found! Max diff: ", max_diff)
-                # ... plotting code ...
-            end
-        end
-        # Normalize to get proper g(r)
-
-
-        
-
-        if method == "out"
-            gr_normalized = 1.0 .- borgis_gr_unnormalized ./ (prefactor)
-            variance .= variance ./ (prefactor^2)
-        else
-            gr_normalized = borgis_gr_unnormalized ./ (prefactor)
-            variance .= variance ./ (prefactor^2)
-        end
-
-        # Output results
-        output_filename = "gr_julia.dat"
-        open(output_filename, "w") do file
-            println(file, "# r\tg(r)\tvar(r)")
-            for bin_idx in 1:num_bins
-                r = (bin_idx - 0.5) * r_bin  # bin center
-                println(file, "$(r)\t$(gr_normalized[bin_idx])\t$(variance[bin_idx])")
-            end
-        end
-
-        println("Results written to $output_filename")
-
-        # Print some statistics
-        println("\nSimulation summary:")
-        println("  Number of particles: $num_particles")
-        println("  Box length: $box_length")
-        println("  Density: $(num_particles / box_length^dimensions)")
-        println("  Bins: $num_bins from $rlow to $rmax")
-        println("  Cutoff distance: $r_cut")
-
-    catch e
-        println("Error: $e")
-        println("Make sure the file $filename exists and has the correct format")
+    # Normalization
+    prefactor = compute_prefactor(N, L_box, dimension)  
+    if method == "out"
+        gr_borgis = 1 .- (borgis_gr_average ./ prefactor)
+    else
+        gr_borgis = borgis_gr_average ./ prefactor
     end
 
-    println("Verifying binary file reader...")
-    borgis_gr_unnormalized_bin, variance_bin = gr_force_from_dir_parallel_binary(directory, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
+    radii = [(i - 0.5) * r_bin for i in 1:num_bins]
+
+    # Plot results
+    plot(radii, gr_borgis, xlabel="r", ylabel="g(r)", title="Borgis g(r) - Force Method", legend=false)
+    savefig(joinpath(dummy_params["directory"], "gr_borgis_force.png"))
 end
 
-# Example function to generate test data
-function generate_test_positions(filename, num_particles, box_length, dimensions)
-    """
-    Generate random test positions in a box
-    """
-    positions = zeros(num_particles, dimensions)
-    for i in 1:num_particles
-        for d in 1:dimensions
-            positions[i, d] = rand() * box_length
-        end
-    end
-    writedlm(filename, positions)
-    println("Generated test positions for $num_particles particles in $filename")
-end
 
-# Run the main function
 if abspath(PROGRAM_FILE) == @__FILE__
-    # Generate test data if needed
-    test_filename = "lj_10000.dat"
-    if !isfile(test_filename)
-        println("Generating test data...")
-        generate_test_positions(test_filename, 100, 10.0, 2)
-    end
-
-    # Run main calculation
     main()
 end
