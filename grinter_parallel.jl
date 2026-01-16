@@ -62,7 +62,7 @@ function main()
     f_target = f_over_r_from_potential(βu_target, r_low, bin_width)
     
     βu_current = if initial_pot == "mean_force"
-        - 1/T * log.(abs.(gr_target))
+        - log.(abs.(gr_target))
     else
         get_potential_from_name(initial_pot, T, r_low, r_high, bin_width)
     end
