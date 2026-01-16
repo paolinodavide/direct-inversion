@@ -62,7 +62,7 @@ function main()
     f_target = f_over_r_from_potential(βu_target, r_low, bin_width)
     
     βu_current = if initial_pot == "mean_force"
-        - log.(abs.(gr_target))
+        - 1/T * log.(abs.(gr_target))
     else
         get_potential_from_name(initial_pot, T, r_low, r_high, bin_width)
     end
@@ -100,6 +100,7 @@ function main()
         end
         delta_pot = gr_normalized[binlow]
         φ = (1.0 - delta_target) / (1.0 - delta_pot)
+        nu = (delta_target - delta_pot) / (delta_target - 1.0)
 
         # Rescale gr
         gr_current = @view gr_normalized[binlow:binhigh]
@@ -108,7 +109,7 @@ function main()
         # Check convergence
         error, iteration_diff = compute_convergence_metrics(gr_current, gr_target, gr_old)
         
-        @info "Iteration $iteration" error=error iteration_diff=iteration_diff phi=φ
+        @info "Iteration $iteration" error=error iteration_diff=iteration_diff phi=φ nu=nu
         
         # Save iteration data      
         append_convergence_data(convergence_file, iteration, time() - start_time, error, iteration_diff, delta_target, φ)
@@ -127,20 +128,33 @@ function main()
     
     # Save final target data
     save_target_data(r_range, gr_target, βu_target, f_target)
-    cp("inputs/params.json", "outputs/00params.json")
+    cp("inputs/params.json", "outputs/00params.json", force=true)
     @info "Optimization completed in $(time() - start_time) seconds"
 end
 
 
-function update_potential!(βu_current, gr_current, gr_target, learning_rate; small_number::Float64=1e-10)
+function update_potential!(βu_t, gr_t, gr_tgt, learning_rate; small_number::Float64=1e-10)
 
-    φ = (gr_target[1]-1) / (gr_current[1]-1)
-    gr_current .= @. abs(φ * (gr_current -1)+1 )
+    φ = (gr_tgt[1]-1) / (gr_t[1]-1)
+    #gr_current .= @. (φ * (gr_current -1)+1 )
+    # if minimum(gr_current) < 0
+    #     @warn "Negative g(r) values detected. Shifting g(r) to avoid log of negative numbers."
+    #     gr_current .= @. (φ * (gr_current -1)+1 )
+    # end
+    
 
-    # @. βu_current += learning_rate * log(abs(gr_current + small_number) / (gr_target + small_number))
+    # @. βu_current += learning_rate * log((gr_current + small_number) / (gr_target + small_number))
     # βu_current .*= φ
-    @. βu_current += learning_rate * (log(gr_current + small_number) - φ * log(gr_target + small_number))
-    βu_current .-= βu_current[end]  
+    # βu_t .= @. βu_t + learning_rate * (log(gr_t + small_number) - φ * log(gr_tgt + small_number))
+    # @. βu_current += learning_rate * (log(gr_current + small_number) - φ * log(gr_target + small_number))
+
+    # @. βu_t = βu_t +  learning_rate * log(gr_t / gr_tgt + (1-φ) / φ / gr_tgt) + learning_rate * log(φ) - (1-φ) * βu_t
+    # @. βu_t = βu_t +  learning_rate * log(gr_t / gr_tgt + (1-φ) / φ / gr_tgt) - (1-φ) * βu_t
+    # @. βu_t = βu_t +  learning_rate * log(gr_t / gr_tgt + (1-φ) / φ / gr_tgt) + learning_rate * log(φ) #- (1-φ) * βu_t
+
+    nu_t = (gr_tgt[1] - gr_t[1]) / (gr_tgt[1] - 1)
+    @. βu_t = βu_t + learning_rate * log((gr_t - nu_t) / gr_tgt) + nu_t  * βu_t
+    βu_t .-= βu_t[end]  
 end
 
 function compute_convergence_metrics(gr_current, gr_target, gr_old)
