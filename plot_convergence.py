@@ -91,16 +91,16 @@ for i, ax in enumerate(axs):
 # Panel A Limits/Labels
 ax_a.set_xlabel(r'$r\, /\, \sigma$')
 ax_a.set_ylabel(r'$g_t(r)$')
-ax_a.set_xticks([1, 2, 3, 4, 5])
-ax_a.set_xlim(0.59, 5)
-ax_a.set_ylim(0, None)
+# ax_a.set_xticks([1, 2, 3, 4, 5])
+# ax_a.set_xlim(0.59, 5)
+# ax_a.set_ylim(0, None)
 
 # Panel B Limits/Labels
 ax_b.set_xlabel(r'$r\, /\, \sigma$')
 ax_b.set_ylabel(r'$\beta u_t(r)$')
-ax_b.set_xticks([1, 2, 3, 4, 5])
-ax_b.set_xlim(0.59, 5)
-ax_b.set_ylim(-0.75, None)
+# ax_b.set_xticks([1, 2, 3, 4, 5])
+# ax_b.set_xlim(0.59, 5)
+# ax_b.set_ylim(-0.75, None)
 
 
 ax_b.legend(loc='upper right')
