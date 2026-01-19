@@ -156,10 +156,11 @@ function update_potential!(βu_t, gr_t, gr_tgt, learning_rate; small_number::Flo
     # @. gr_t = abs(gr_t - nu_t)
 
     min_index = findmin(gr_t)[2]
-    nu_t = (gr_tgt[min_index] - gr_t[min_index]) / (gr_tgt[min_index] - 1)
-    @. gr_t = (gr_t - nu_t)
+    phi_t = (gr_tgt[min_index] - 1) / (gr_t[min_index] - 1)
+    nu_t = phi_t - 1.0
+    @. gr_t = (phi_t * gr_t - nu_t)
 
-    @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt) + nu_t  * βu_t
+    @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt) + nu_t / phi_t * βu_t
     βu_t .-= βu_t[end]  
 end
 
