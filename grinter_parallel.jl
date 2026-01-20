@@ -158,8 +158,13 @@ function update_potential!(βu_t, gr_t, gr_tgt, learning_rate; small_number::Flo
     min_index = findmin(gr_t)[2]
     g_min = gr_t[min_index]
     Delta = g_min - gr_tgt[min_index]
+    Delta = 0.0
     #nu_t = (gr_tgt[min_index] - gr_t[min_index]) / (gr_tgt[min_index] - 1)
     @. gr_t = gr_t - Delta
+    if minimum(gr_t) < 0
+        @error "Negative g(r). Retry with higher r_low"
+        exit(1)
+    end
 
     @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt) + Delta * βu_t
     βu_t .-= βu_t[end]  
