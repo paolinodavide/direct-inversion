@@ -39,6 +39,8 @@ function main()
     learning_rate = params["learning_rate"]::Float64
     convergence_tol = params["target_precision"]::Float64
     method_force_formula = params["method_force_formula"]::String
+    core_strength = params["core_strength"]::Int
+    shift_gr = params["shift_gr"]::Bool
 
     # Create output directory
     mkpath("outputs")
@@ -89,7 +91,8 @@ function main()
         # βu_t → gr_t
         gr_notNorm, _ = gr_force_from_dir_parallel_binary(
             config_dir, L_box, bin_width, num_bins, 
-            f_current, r_low, r_high, method_force_formula
+            f_current, r_low, r_high, method_force_formula; 
+            core_strength=core_strength
         )
         
         # Normalize and update gr
@@ -98,21 +101,19 @@ function main()
         else
             gr_normalized = gr_notNorm ./ prefactor
         end
-        delta_pot = gr_normalized[binlow]
-        φ = (1.0 - delta_target) / (1.0 - delta_pot)
-        nu = (delta_target - delta_pot) / (delta_target - 1.0)
 
         # Rescale gr
         gr_current = @view gr_normalized[binlow:binhigh]
+        g_min = minimum(gr_current)
         save_iteration_data(iteration, r_range, gr_current, βu_current, f_current)
 
         # Check convergence
         error, iteration_diff = compute_convergence_metrics(gr_current, gr_target, gr_old)
         
-        @info "Iteration $iteration" error=error iteration_diff=iteration_diff phi=φ nu=nu
+        @info "Iteration $iteration" error=error iteration_diff=iteration_diff g_min=g_min
         
         # Save iteration data      
-        append_convergence_data(convergence_file, iteration, time() - start_time, error, iteration_diff, delta_target, φ)
+        append_convergence_data(convergence_file, iteration, time() - start_time, error, iteration_diff, delta_target, g_min)
         
         if error < convergence_tol || iteration_diff < convergence_tol
             @info "Convergence achieved" iteration=iteration
@@ -122,7 +123,7 @@ function main()
         end
 
         # u_t → u_t+1
-        update_potential!(βu_current, gr_current, gr_target, learning_rate)
+        update_potential!(βu_current, gr_current, gr_target, learning_rate, shift_gr)
         f_current = f_over_r_from_potential(βu_current, r_low, bin_width)
     end
     
@@ -133,40 +134,19 @@ function main()
 end
 
 
-function update_potential!(βu_t, gr_t, gr_tgt, learning_rate; small_number::Float64=1e-10)
-
-    φ = (gr_tgt[1]-1) / (gr_t[1]-1)
-    #gr_current .= @. (φ * (gr_current -1)+1 )
-    # if minimum(gr_current) < 0
-    #     @warn "Negative g(r) values detected. Shifting g(r) to avoid log of negative numbers."
-    #     gr_current .= @. (φ * (gr_current -1)+1 )
-    # end
-    
-
-    # @. βu_current += learning_rate * log((gr_current + small_number) / (gr_target + small_number))
-    # βu_current .*= φ
-    # βu_t .= @. βu_t + learning_rate * (log(gr_t + small_number) - φ * log(gr_tgt + small_number))
-    # @. βu_current += learning_rate * (log(gr_current + small_number) - φ * log(gr_target + small_number))
-
-    # @. βu_t = βu_t +  learning_rate * log(gr_t / gr_tgt + (1-φ) / φ / gr_tgt) + learning_rate * log(φ) - (1-φ) * βu_t
-    # @. βu_t = βu_t +  learning_rate * log(gr_t / gr_tgt + (1-φ) / φ / gr_tgt) - (1-φ) * βu_t
-    # @. βu_t = βu_t +  learning_rate * log(gr_t / gr_tgt + (1-φ) / φ / gr_tgt) + learning_rate * log(φ) #- (1-φ) * βu_t
-
-    # nu_t = (gr_tgt[1] - gr_t[1]) / (gr_tgt[1] - 1)
-    # @. gr_t = abs(gr_t - nu_t)
-
+function update_potential!(βu_t, gr_t, gr_tgt, learning_rate, correct_offset::Bool=false; small_number::Float64=1e-10)
     min_index = findmin(gr_t)[2]
     g_min = gr_t[min_index]
-    Delta = g_min - gr_tgt[min_index]
     Delta = 0.0
-    #nu_t = (gr_tgt[min_index] - gr_t[min_index]) / (gr_tgt[min_index] - 1)
+    correct_offset && (Delta = g_min - gr_tgt[min_index])
+
     @. gr_t = gr_t - Delta
     if minimum(gr_t) < 0
         @error "Negative g(r). Retry with higher r_low"
         exit(1)
     end
 
-    @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt) + Delta * βu_t
+    @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt) 
     βu_t .-= βu_t[end]  
 end
 
