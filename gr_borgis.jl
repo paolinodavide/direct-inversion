@@ -1,6 +1,7 @@
 using LoopVectorization
 using StaticArrays
 using Revise
+using Statistics
 
 @inline function wrap_pbc_distances(separation::Float64, box_length::Float64, inv_box_length::Float64)::Float64
     """Apply minimum image convention for periodic boundary conditions."""
@@ -29,7 +30,8 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
     force_over_r::Vector{Float64},
     r_min::Float64,
     r_cutoff::Float64,
-    method::String="out") where D
+    method::String="out";
+    core_strength::Int=13) where D
     
     num_particles, num_dimensions = size(particle_positions)
     inv_bin_width = 1.0 / bin_width
@@ -55,7 +57,8 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
 
             #f_magnitude::Float64 = 0.0
             f_magnitude = if r_ij < r_min
-                force_over_r[1] + (r_ij - r_min) * inv_bin_width * (force_over_r[2] - force_over_r[1])
+                #force_over_r[1] + (r_ij - r_min) * inv_bin_width * (force_over_r[2] - force_over_r[1])
+                force_over_r[1] * (r_min/r_ij)^core_strength
             else
                 radial_bin_index = floor(Int, r_ij * inv_bin_width)
                 force_table_index = radial_bin_index - floor(Int, r_min * inv_bin_width) + 1
@@ -427,7 +430,7 @@ end
 
 function gr_force_from_dir_parallel_binary(directory::String, box_length::Float64, r_bin::Float64, 
     num_bins::Int, force_div_r::Vector{Float64}, 
-    rlow::Float64, r_cut::Float64, method::String="out")
+    rlow::Float64, r_cut::Float64, method::String="out"; core_strength::Int=13)
     """
     Optimized version using binary files
     """
@@ -449,18 +452,72 @@ function gr_force_from_dir_parallel_binary(directory::String, box_length::Float6
     # Process files in parallel with binary reader
     results = ThreadsX.map(file_paths) do filepath
     particle_positions = read_particle_positions_binary(filepath)  # or mmap version
-    grForce_notNorm_svectorized(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method)
+    grForce_notNorm_svectorized(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method; core_strength=core_strength)
     end
 
     # Combine results (same as before)
-    borgis_gr_total = sum(results)
-    file_count = length(file_paths)
-    borgis_gr_average = borgis_gr_total ./ file_count
+    if method != "both"
+        borgis_gr_total = sum(results)
+        file_count = length(file_paths)
+        borgis_gr_average = borgis_gr_total ./ file_count
 
-    squared_sum = sum(x -> x .^ 2, results)
-    variance = squared_sum ./ file_count .- borgis_gr_average .^ 2
+        squared_sum = sum(x -> x .^ 2, results)
+        variance = squared_sum ./ file_count .- borgis_gr_average .^ 2
+        return borgis_gr_average, variance
+    elseif method == "both"
+        # 1. Setup metadata
+        sample_pos = read_particle_positions_binary(file_paths[1])
+        N, dim = size(sample_pos)
+        prefactor = compute_prefactor(N, box_length, dim)
+        inv_prefactor = 1.0 / prefactor
 
-    return borgis_gr_average, variance
+        # 2. Pre-allocate matrices to avoid push! and reduce(hcat)
+        num_results = length(results)
+        num_bins = length(results[1])
+        
+        # We can compute grOpt directly to save memory
+        grOpt_sum = zeros(Float64, num_bins)
+        half_bins = div(num_bins, 2)
+        
+        # Pre-allocate a reusable buffer for cumsum calculations
+        temp_cumsum = Vector{Float64}(undef, num_bins)
+
+        for result in results
+            # Calculate gr0 (forward cumsum)
+            cumsum!(temp_cumsum, result)
+            
+            # Calculate grInf (backward cumsum logic)
+            # Instead of multiple reverses, we use the fact that:
+            # rev_cumsum[end] is the total sum.
+            total_sum = temp_cumsum[end]
+            
+            for i in 1:num_bins
+                # Logic: gr0 is temp_cumsum[i] * inv_prefactor
+                # Logic: grInf is 1 - (total_sum - (i > 1 ? temp_cumsum[i-1] : 0)) * inv_prefactor
+                
+                val_gr0 = temp_cumsum[i] * inv_prefactor
+                
+                # Efficiently compute the reverse cumsum value without creating new arrays
+                current_rev_cumsum = total_sum - (i > 1 ? temp_cumsum[i-1] : 0)
+                val_grInf = 1.0 - (current_rev_cumsum * inv_prefactor)
+                
+                # Apply lambda0 logic: use gr0 for first half, grInf for second half
+                if i <= half_bins
+                    grOpt_sum[i] += val_gr0
+                else
+                    grOpt_sum[i] += val_grInf
+                end
+            end
+        end
+
+        # Average the sum and scale back by prefactor
+        grOpt_estimator = (grOpt_sum ./ num_results) .* prefactor
+        
+        # Generate lambda0 for return
+        lambda0 = vcat(zeros(half_bins), ones(num_bins - half_bins))
+        
+        return grOpt_estimator, lambda0
+    end
 end
 
 

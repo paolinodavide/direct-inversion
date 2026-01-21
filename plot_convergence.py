@@ -7,6 +7,11 @@ import matplotlib.cm as cm
 Path = './outputs/'
 iterations_prefix = 'iteration_'
 
+plt.rcParams.update({
+    "mathtext.fontset": "cm",       # Math font matching Computer Modern
+    "axes.labelsize": 'x-large',
+})
+
 # 1. Get and sort files
 if not os.path.exists(Path):
     os.makedirs(Path)
@@ -65,38 +70,44 @@ try:
     it, _, err, it_diff, _, _ = np.loadtxt(os.path.join(Path, 'convergence_data.dat'), unpack=True)
     ax_c.semilogy(it, err, label=r'MSE$(g_t, g_{\text{ref}})$', color=colors[25], linewidth=2)
     ax_c.semilogy(it, it_diff, label=r'MSE$(g_t, g_{t-1})$', color=colors[num_files*2//3], linewidth=2     )
-    ax_c.legend(fontsize='small', frameon=True)
+    ax_c.legend(handlelength=1, frameon=True)
     ax_c.set_xlim(0, max(it))
 except:
     ax_c.set_title('Convergence Data Not Found', fontsize=10)
 
 # 6. Formatting & Panel Labels
 labels = ['(a)', '(b)', '(c)']
-separations = [-0.18, -0.15, -0.23]  # Custom separations for panel labels
+separations = [-0.18, -0.23, -0.23]  # Custom separations for panel labels
 for i, ax in enumerate(axs):
     ax.tick_params(direction='in', which='both', top=True, right=True)
     for spine in ax.spines.values():
         spine.set_linewidth(1.2)
     
     
-    ax.text(separations[i], 1.05, labels[i], transform=ax.transAxes, 
+    ax.text(separations[i], 1.0, labels[i], transform=ax.transAxes, 
             fontsize=11, fontweight='bold', va='top', ha='right')
     
 
 # Panel A Limits/Labels
 ax_a.set_xlabel(r'$r\, /\, \sigma$')
 ax_a.set_ylabel(r'$g_t(r)$')
+# ax_a.set_xticks([1, 2, 3, 4, 5])
+# ax_a.set_xlim(0.59, 5)
+# ax_a.set_ylim(0, None)
 
 # Panel B Limits/Labels
 ax_b.set_xlabel(r'$r\, /\, \sigma$')
 ax_b.set_ylabel(r'$\beta u_t(r)$')
+# ax_b.set_xticks([1, 2, 3, 4, 5])
+# ax_b.set_xlim(0.59, 5)
+# ax_b.set_ylim(-0.75, None)
 
 
 ax_b.legend(loc='upper right')
 
 # Panel C Labels
-ax_c.set_xlabel(r'Iteration $t$')
-ax_c.set_ylabel('Convergence Metrics')
+ax_c.set_xlabel(r'Iteration $t$', size='large')
+ax_c.set_ylabel('Convergence Metrics', size='large')
 
 # Save and Show
 plt.savefig(os.path.join(Path, '00Convergence_Highlight.pdf'), dpi=300)
