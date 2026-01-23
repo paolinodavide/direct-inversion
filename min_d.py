@@ -87,11 +87,14 @@ def main():
 
     # Set the same y-axis limits
     plt.ylim(y_min, y_max)
+    print(f"Average Minimum Distance: {np.mean(min_distances):.4f} ± {np.std(min_distances):.4f} " + r' $\sigma$')
 
     # Save and show
     plt.tight_layout()
     plt.savefig(output_path+"min_distances.pdf", dpi=300)
     plt.show()
+
+    
 
     sorted_file_numbers = [file_number for file_number, _ in sorted(results, key=lambda x: x[1])]
     np.savetxt(inputs_path+"ordered_wt.dat", sorted_file_numbers, 

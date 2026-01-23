@@ -43,7 +43,7 @@ for i, file in enumerate(files):
             alpha_val, lw, z, label_val = 1.0, 1.4, 10, None
         elif file == 'iteration_-1.dat':
             colors[i] = cm.seismic(0)  
-            alpha_val, lw, z, label_val = 1.0, 1.4, 11, r'Potential $r^{-3}$'
+            alpha_val, lw, z, label_val = 1.0, 1.4, 11, r'True Potential'
         else:
             alpha_val, lw, z, label_val = 0.6, 0.7, 1, None
 

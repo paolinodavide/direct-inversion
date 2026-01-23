@@ -37,7 +37,8 @@ function main()
     # Optimization parameters
     max_iter = params["max_iter"]::Int
     learning_rate = params["learning_rate"]::Float64
-    convergence_tol = params["target_precision"]::Float64
+    target_tol = params["target_precision"]::Float64
+    iteration_tol = params["iteration_precision"]::Float64
     method_force_formula = params["method_force_formula"]::String
     core_strength = params["core_strength"]::Int
     shift_gr = params["shift_gr"]::Bool
@@ -110,12 +111,12 @@ function main()
         # Check convergence
         error, iteration_diff = compute_convergence_metrics(gr_current, gr_target, gr_old)
         
-        @info "Iteration $iteration" error=error iteration_diff=iteration_diff g_min=g_min
+        @info "Iteration $iteration" error=error iteration_diff=iteration_diff g_min=g_min delta=(gr_current[1] - delta_target)
         
         # Save iteration data      
         append_convergence_data(convergence_file, iteration, time() - start_time, error, iteration_diff, delta_target, g_min)
         
-        if error < convergence_tol || iteration_diff < convergence_tol
+        if error < target_tol || iteration_diff < iteration_tol
             @info "Convergence achieved" iteration=iteration
 
             save_gr_data(r_values, gr_normalized, "gr_final.dat")
@@ -138,7 +139,7 @@ function update_potential!(βu_t, gr_t, gr_tgt, learning_rate, correct_offset::B
     min_index = findmin(gr_t)[2]
     g_min = gr_t[min_index]
     Delta = 0.0
-    correct_offset && (Delta = g_min - gr_tgt[min_index])
+    correct_offset && (Delta = g_min - gr_tgt[min_index] + small_number)
 
     @. gr_t = gr_t - Delta
     if minimum(gr_t) < 0
@@ -146,7 +147,7 @@ function update_potential!(βu_t, gr_t, gr_tgt, learning_rate, correct_offset::B
         exit(1)
     end
 
-    @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt) 
+    @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt )
     βu_t .-= βu_t[end]  
 end
 
