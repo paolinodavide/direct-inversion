@@ -139,7 +139,7 @@ function update_potential!(βu_t, gr_t, gr_tgt, learning_rate, correct_offset::B
     min_index = findmin(gr_t)[2]
     g_min = gr_t[min_index]
     Delta = 0.0
-    correct_offset && (Delta = g_min - gr_tgt[min_index] + small_number)
+    correct_offset && (Delta = g_min - gr_tgt[min_index])
 
     @. gr_t = gr_t - Delta
     if minimum(gr_t) < 0

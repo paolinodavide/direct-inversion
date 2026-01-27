@@ -57,7 +57,12 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
 
             #f_magnitude::Float64 = 0.0
             f_magnitude = if r_ij < r_min
-                force_over_r[1] + (r_ij - r_min) * inv_bin_width * (force_over_r[2] - force_over_r[1])
+                if core_strength == 0
+                    0.0
+                else
+                    force_over_r[1] * (r_min/r_ij)^core_strength
+                end
+                #force_over_r[1] + (r_ij - r_min) * inv_bin_width * (force_over_r[2] - force_over_r[1])
                 #force_over_r[1] * (r_min/r_ij)^core_strength
             else
                 radial_bin_index = floor(Int, r_ij * inv_bin_width)
