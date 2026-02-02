@@ -2,6 +2,7 @@ using JSON
 using DelimitedFiles
 using LinearAlgebra
 using Plots
+using Revise
 
 include("utils.jl")
 include("gr_borgis.jl")
@@ -28,7 +29,7 @@ function main()
     # File paths
     path_target = "inputs"
     config_dir = joinpath(path_target, params["config_dir"]::String)
-    target_file = params["target_gr_file"]::Stringlength
+    target_file = params["target_gr_file"]::String
     initial_pot = params["init_pot_type"]::String
     target_pot = params["target_pot_type"]::String
     number_config = params["n_inversion_snapshots"]::Int
@@ -141,13 +142,13 @@ function update_potential!(βu_t, gr_t, gr_tgt, learning_rate, correct_offset::B
     Delta = 0.0
     correct_offset && (Delta = g_min - gr_tgt[min_index])
 
-    @. gr_t = gr_t - Delta
-    if minimum(gr_t) < 0
+    @. gr_t = gr_t - Delta 
+    if minimum(gr_t) < 0 || any(isnan.(gr_t))
         @error "Negative g(r). Retry with higher r_low"
         exit(1)
     end
 
-    @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt )
+    @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt + small_number)
     βu_t .-= βu_t[end]  
 end
 
