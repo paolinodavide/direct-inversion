@@ -20,15 +20,15 @@ function main()
     r_low = params["r_low"]::Float64
     r_high = params["r_high"]::Float64
     bin_width = params["bin_width"]::Float64
-    binlow = Int(floor(r_low / bin_width)) + 1
-    binhigh = Int(floor(r_high / bin_width)) + 1
-    max_distance = 10.0
-    num_bins = Int(floor(max_distance / bin_width))
+    binlow = floor(Int, r_low / bin_width) + 1
+    binhigh = floor(Int, r_high / bin_width) + 1
+    max_distance = min(L_box / 2.0, 10.0)
+    num_bins_gr = floor(Int, max_distance / bin_width)
 
     # File paths
     path_target = "inputs"
     config_dir = joinpath(path_target, params["config_dir"]::String)
-    target_file = params["target_gr_file"]::String
+    target_file = params["target_gr_file"]::Stringlength
     initial_pot = params["init_pot_type"]::String
     target_pot = params["target_pot_type"]::String
     number_config = params["n_inversion_snapshots"]::Int
@@ -91,7 +91,7 @@ function main()
         
         # βu_t → gr_t
         gr_notNorm, _ = gr_force_from_dir_parallel_binary(
-            config_dir, L_box, bin_width, num_bins, 
+            config_dir, L_box, bin_width, num_bins_gr, 
             f_current, r_low, r_high, method_force_formula; 
             core_strength=core_strength
         )

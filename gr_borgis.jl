@@ -26,16 +26,15 @@ Method specifyes the integration direction:
 function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
     box_length::Float64,
     bin_width::Float64,
-    num_bins::Int,
+    num_bins_gr::Int,
     force_over_r::Vector{Float64},
-    r_min::Float64,
-    r_cutoff::Float64,
+    r_min_interaction::Float64,
+    r_cutoff_interaction::Float64,
     method::String="out";
     core_strength::Int=13) where D
     
     num_particles, num_dimensions = size(particle_positions)
     inv_bin_width = 1.0 / bin_width
-
 
     positions = [SVector{D, Float64}(particle_positions'[:, i]) for i in 1:num_particles]
     total_forces = [SVector{D, Float64}(zeros(num_dimensions)) for _ in 1:num_particles]
@@ -48,7 +47,7 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
             pos_j = positions[j]
 
             rVec_ij, r2_ij= pbc_distance(pos_i, pos_j, box_length)
-            if r2_ij == 0.0 || r2_ij > r_cutoff^2
+            if r2_ij == 0.0 || r2_ij > r_cutoff_interaction^2
                 continue
             end
 
@@ -56,17 +55,17 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
 
 
             #f_magnitude::Float64 = 0.0
-            f_magnitude = if r_ij < r_min
+            f_magnitude = if r_ij < r_min_interaction
                 if core_strength == 0
                     0.0
                 else
-                    force_over_r[1] * (r_min/r_ij)^core_strength
+                    force_over_r[1] * (r_min_interaction/r_ij)^core_strength
                 end
                 #force_over_r[1] + (r_ij - r_min) * inv_bin_width * (force_over_r[2] - force_over_r[1])
                 #force_over_r[1] * (r_min/r_ij)^core_strength
             else
                 radial_bin_index = floor(Int, r_ij * inv_bin_width)
-                force_table_index = radial_bin_index - floor(Int, r_min * inv_bin_width) + 1
+                force_table_index = radial_bin_index - floor(Int, r_min_interaction * inv_bin_width) + 1
                 interpolation_weight = r_ij * inv_bin_width - radial_bin_index
                 (1.0 - interpolation_weight) * force_over_r[force_table_index] + interpolation_weight * force_over_r[force_table_index+1]
             end
@@ -77,7 +76,7 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
     end
 
 
-    borgis_contributions = zeros(Float64, num_bins)
+    borgis_contributions = zeros(Float64, num_bins_gr)
     @inbounds for i in 1:num_particles
         pos_i = positions[i]
         force_i = total_forces[i]
@@ -93,7 +92,7 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
 
             r_ij = sqrt(r2_ij)
             radial_bin_index = floor(Int, r_ij * inv_bin_width)
-            target_bin = clamp(radial_bin_index + 1, 1, num_bins)
+            target_bin = clamp(radial_bin_index + 1, 1, num_bins_gr)
 
             force_diff = force_i - force_j
             borgis_delta = if num_dimensions == 2
