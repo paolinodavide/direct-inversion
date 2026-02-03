@@ -53,9 +53,11 @@ function main()
     r_range = r_low:bin_width:r_high
     #print length r range and r_Values[binlow:binhigh]
     if length(r_range) != length(r_values[binlow:binhigh])
-        binhigh = binlow + length(r_range) - 1
+        @warn "Mismatch in r_range length and target g(r) range length"
+        println("binlow: $binlow, binhigh: $binhigh")
+        binhigh = binhigh - 1
+        println("Adjusted binhigh to $binhigh")
     end
-    r_range
     save_gr_data(r_values, full_target_gr, "gr_target.dat")
 
     gr_target = @view full_target_gr[binlow:binhigh]
@@ -140,7 +142,9 @@ function update_potential!(βu_t, gr_t, gr_tgt, learning_rate, correct_offset::B
     min_index = findmin(gr_t)[2]
     g_min = gr_t[min_index]
     Delta = 0.0
-    correct_offset && (Delta = g_min - gr_tgt[min_index])
+    if correct_offset
+        Delta = g_min - gr_tgt[min_index] 
+    end
 
     @. gr_t = gr_t - Delta 
     if minimum(gr_t) < 0 || any(isnan.(gr_t))
