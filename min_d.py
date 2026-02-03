@@ -88,6 +88,11 @@ def main():
     # Set the same y-axis limits
     plt.ylim(y_min, y_max)
     print(f"Average Minimum Distance: {np.mean(min_distances):.4f} ± {np.std(min_distances):.4f} " + r' $\sigma$')
+    # Average of first 125 configs
+    min_distances = sorted(min_distances)
+    first_125_avg = np.mean(min_distances[:125])
+    first_125_std = np.std(min_distances[:125])
+    print(f"First 125 Configs Average Minimum Distance: {first_125_avg:.4f} ± {first_125_std:.4f} " + r' $\sigma$')
 
     # Save and show
     plt.tight_layout()
