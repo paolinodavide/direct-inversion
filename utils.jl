@@ -81,13 +81,13 @@ end
 
 function initialize_convergence_file(filename)
     open(filename, "w") do io
-        write(io, "# iteration\ttime\terror\titeration_difference\tdelta_tgt\tphi\n")
+        write(io, "# iteration\ttime\terror\titeration_difference\tpotential_increase\tdelta_tgt\tphi\n")
     end
 end
 
-function append_convergence_data(filename, iteration, elapsed_time, error, iteration_diff, delta_target, phi) 
+function append_convergence_data(filename, iteration, elapsed_time, error, iteration_diff, potential_increase, delta_target, phi) 
     open(filename, "a") do io
-        writedlm(io, [[iteration elapsed_time error iteration_diff delta_target phi]])
+        writedlm(io, [[iteration elapsed_time error iteration_diff potential_increase delta_target phi]])
     end
 end
 
