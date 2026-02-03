@@ -8,6 +8,9 @@ import glob
 from numba import njit
 import matplotlib.pyplot as plt
 
+# set numpy seed
+np.random.seed(2001)
+
 def find_config_files(directory='./configs/', pattern='*.dat'):
     """Find all LJ configuration files in the directory"""
     files = glob.glob(os.path.join(directory, pattern))
@@ -62,6 +65,9 @@ def main():
     
     # Extract file numbers and minimum distances
     file_numbers, min_distances = zip(*results)
+    
+    # Create a mapping from file number to minimum distance
+    file_to_dist = dict(results)
 
     plt.figure(figsize=(10, 6))
     plt.subplot(1, 2, 1)
@@ -88,10 +94,12 @@ def main():
     # Set the same y-axis limits
     plt.ylim(y_min, y_max)
     print(f"Average Minimum Distance: {np.mean(min_distances):.4f} ± {np.std(min_distances):.4f} " + r' $\sigma$')
-    # Average of first 125 configs
-    min_distances = sorted(min_distances)
-    first_125_avg = np.mean(min_distances[:125])
-    first_125_std = np.std(min_distances[:125])
+    
+    # Average of first 125 configs (sorted by minimum distance)
+    sorted_results = sorted(results, key=lambda x: x[1])
+    first_125_dists = [dist for _, dist in sorted_results[:125]]
+    first_125_avg = np.mean(first_125_dists)
+    first_125_std = np.std(first_125_dists)
     print(f"First 125 Configs Average Minimum Distance: {first_125_avg:.4f} ± {first_125_std:.4f} " + r' $\sigma$')
 
     # Save and show
@@ -101,13 +109,19 @@ def main():
 
     
 
-    sorted_file_numbers = [file_number for file_number, _ in sorted(results, key=lambda x: x[1])]
+    sorted_file_numbers = [file_number for file_number, _ in sorted_results]
     np.savetxt(inputs_path+"ordered_wt.dat", sorted_file_numbers, 
            header='wt ordered by min dist', fmt='%d')
     
     shuffled_file_numbers = np.random.permutation(sorted_file_numbers)
     np.savetxt(inputs_path+"shuffled_wt.dat", shuffled_file_numbers, 
            header='wt shuffled', fmt='%d')
+    
+    shuffled_125_dists = [file_to_dist[fn] for fn in shuffled_file_numbers[:125]]
+    shuffled_125_avg = np.mean(shuffled_125_dists)
+    shuffled_125_std = np.std(shuffled_125_dists)
+    print(f"First 125 Configs (shuffled) Average Minimum Distance: {shuffled_125_avg:.4f} ± {shuffled_125_std:.4f} " + r' $\sigma$')
+    
         
     return
 
