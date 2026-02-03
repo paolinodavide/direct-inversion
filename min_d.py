@@ -104,6 +104,10 @@ def main():
     sorted_file_numbers = [file_number for file_number, _ in sorted(results, key=lambda x: x[1])]
     np.savetxt(inputs_path+"ordered_wt.dat", sorted_file_numbers, 
            header='wt ordered by min dist', fmt='%d')
+    
+    shuffled_file_numbers = np.random.permutation(sorted_file_numbers)
+    np.savetxt(inputs_path+"shuffled_wt.dat", shuffled_file_numbers, 
+           header='wt shuffled', fmt='%d')
         
     return
 

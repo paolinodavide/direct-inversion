@@ -112,12 +112,12 @@ function main()
         save_iteration_data(iteration, r_range, gr_current, βu_current, f_current)
 
         # Check convergence
-        error, iteration_diff = compute_convergence_metrics(gr_current, gr_target, gr_old)
+        error, iteration_diff, potential_increase = compute_convergence_metrics(gr_current, gr_target, gr_old)
         
-        @info "Iteration $iteration" error=error iteration_diff=iteration_diff g_min=g_min delta=(gr_current[1] - delta_target)
+        @info "Iteration $iteration" error=error iteration_diff=iteration_diff potential_increase=potential_increase g_min=g_min delta=(gr_current[1] - delta_target)
         
         # Save iteration data      
-        append_convergence_data(convergence_file, iteration, time() - start_time, error, iteration_diff, delta_target, g_min)
+        append_convergence_data(convergence_file, iteration, time() - start_time, error, iteration_diff, potential_increase, delta_target, g_min)
         
         if error < target_tol || iteration_diff < iteration_tol
             @info "Convergence achieved" iteration=iteration
@@ -159,7 +159,8 @@ end
 function compute_convergence_metrics(gr_current, gr_target, gr_old)
     error = sum((gr_current .- gr_target).^2) / length(gr_target)
     iteration_diff = sum((gr_current .- gr_old).^2) / length(gr_current)
-    return error, iteration_diff
+    potential_increase = sum((log.(gr_current ./ gr_target)).^2) / length(gr_current)
+    return error, iteration_diff, potential_increase
 end
 
 function f_over_r_from_potential(potential::Vector{Float64}, r_low::Float64, bin_width::Float64)::Vector{Float64}
