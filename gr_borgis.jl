@@ -2,6 +2,11 @@ using LoopVectorization
 using StaticArrays
 using Revise
 using Statistics
+using ThreadsX
+using JSON
+using DelimitedFiles
+using LinearAlgebra
+using Plots
 
 @inline function wrap_pbc_distances(separation::Float64, box_length::Float64, inv_box_length::Float64)::Float64
     """Apply minimum image convention for periodic boundary conditions."""
@@ -254,10 +259,6 @@ function grForce_notNorm(particle_positions::Matrix{Float64},
     end
 end
 
-using DelimitedFiles
-using LinearAlgebra
-using Plots
-
 function lennard_jones_force_div_r(r, epsilon=1.0, sigma=1.0)
     """
     Compute Lennard-Jones force divided by r: F(r)/r = 24ϵ/σ² * (2(σ/r)^14 - (σ/r)^8)
@@ -343,9 +344,6 @@ function gr_force_from_dir(directory::String, box_length::Float64, r_bin::Float6
         throw(ArgumentError("No valid configuration files found in directory: $directory"))
     end
 end
-
-using ThreadsX
-using Profile
 
 function gr_force_from_dir_parallel(directory::String, box_length::Float64, r_bin::Float64, num_bins::Int, force_div_r::Vector{Float64}, rlow::Float64, r_cut::Float64, method::String="out")
     """
@@ -534,8 +532,6 @@ function compute_prefactor(N_particles, box_length, dimension)
         throw(ArgumentError("Unsupported dimension: $dimension. Only 2D and 3D are supported."))
     end
 end
-
-using JSON
 
 function main()
     dummy_params = Dict(

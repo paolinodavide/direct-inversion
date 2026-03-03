@@ -49,7 +49,7 @@ Run the following scripts from the project root to prepare the target data for t
 Edit the parameter file `./inputs/paramters.json`. 
 Execute the main iterative Boltzmann inversion routine using Julia:
 ```bash
-julia -t auto forceIBI/grinter_parallel.jl
+julia --project=forceIBI -t auto forceIBI/grinter_parallel.jl
 ```
 This will perform the effective potential reconstruction. 
 
