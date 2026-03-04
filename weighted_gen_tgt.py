@@ -42,7 +42,7 @@ def get_weights(r, gr):
 def main():
     rdf_path = "outputs/rdfs/"
     r, g_r, var_g = np.loadtxt(rdf_path+ 'g_r_h_avg.dat', unpack=True)
-    plt.semilogy(r, g_r, 'o', label='Histo RDF', markersize=3)
+    plt.plot(r, g_r, 'o', label='Histo RDF', markersize=3)
 
     try:
         r_old, gr_tgt_old = np.loadtxt('./gs_target.dat', unpack=True)
@@ -65,7 +65,7 @@ def main():
         print(f"\nWarning: g_smoothed has a minimum value of {g_min}, below the threshold.")
 
     radii = np.linspace(r[0], r[-1], 10_000)
-    plt.semilogy(radii, spline(radii), '--', label='Weighted Spline')
+    plt.plot(radii, spline(radii), '--', label='Weighted Spline')
     plt.xlabel('r')
     plt.ylabel('g(r)')
     plt.legend()

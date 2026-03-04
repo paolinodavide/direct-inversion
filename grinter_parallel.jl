@@ -159,7 +159,7 @@ end
 function compute_convergence_metrics(gr_current, gr_target, gr_old)
     error = sum((gr_current .- gr_target).^2) / length(gr_target)
     iteration_diff = sum((gr_current .- gr_old).^2) / length(gr_current)
-    potential_increase = sum((log.(gr_current ./ gr_target)).^2) / length(gr_current)
+    potential_increase = sum((log.(abs.(gr_current ./ gr_target))).^2) / length(gr_current)
     return error, iteration_diff, potential_increase
 end
 
