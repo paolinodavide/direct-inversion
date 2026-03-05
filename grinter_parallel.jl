@@ -69,7 +69,7 @@ function main()
         binhigh = binhigh - 1
         println("Adjusted binhigh to $binhigh")
     end
-    save_gr_data(r_values, full_target_gr, "gr_target.dat")
+    save_gr_data(r_values, full_target_gr, joinpath(HomeDir, "outputs/gr_target.dat"))
 
     gr_target = @view full_target_gr[binlow:binhigh]
     gr_current = copy(gr_target)
@@ -120,7 +120,7 @@ function main()
         # Rescale gr
         gr_current = @view gr_normalized[binlow:binhigh]
         g_min = minimum(gr_current)
-        save_iteration_data(iteration, r_range, gr_current, βu_current, f_current)
+        save_iteration_data(iteration, r_range, gr_current, βu_current, f_current, HomeDir)
 
         # Check convergence
         error, iteration_diff, potential_increase = compute_convergence_metrics(gr_current, gr_target, gr_old)

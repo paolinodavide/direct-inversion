@@ -91,9 +91,9 @@ function append_convergence_data(filename, iteration, elapsed_time, error, itera
     end
 end
 
-function save_iteration_data(iteration, r_range, gr_current, βu_current, f_current)
+function save_iteration_data(iteration, r_range, gr_current, βu_current, f_current, home_dir::String)
     output_data = hcat(collect(r_range), gr_current, βu_current, f_current)
-    open("outputs/iteration_$iteration.dat", "w") do io
+    open(joinpath(home_dir, "outputs/iteration_$iteration.dat"), "w") do io
         write(io, "# r\tgr\tu\tf/r\n")
         writedlm(io, output_data)
     end
