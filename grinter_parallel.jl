@@ -3,13 +3,24 @@ using DelimitedFiles
 using LinearAlgebra
 using Plots
 using Revise
+using ArgParse
 
 include("utils.jl")
 include("gr_borgis.jl")
 
 function main()
+    s = ArgParseSettings()
+    @add_arg_table s begin
+        "--directory", "-d"
+            help = "Directory containing input files (default: inputs)"
+            arg_type = String
+            default = "inputs"
+    end
+    parsed_args = parse_args(s)
+    HomeDir = parsed_args["directory"]
+    
     # Load parameters
-    params = JSON.parsefile("inputs/params.json")
+    params = JSON.parsefile(joinpath(HomeDir, "inputs/params.json"))
     
     # Extract parameters with clear grouping
     N_particles = params["N_particles"]::Int
@@ -27,7 +38,7 @@ function main()
     num_bins_gr = floor(Int, max_distance / bin_width)
 
     # File paths
-    path_target = "inputs"
+    path_target = joinpath(HomeDir, "inputs")
     config_dir = joinpath(path_target, params["config_dir"]::String)
     target_file = params["target_gr_file"]::String
     initial_pot = params["init_pot_type"]::String
@@ -45,7 +56,7 @@ function main()
     shift_gr = params["shift_gr"]::Bool
 
     # Create output directory
-    mkpath("outputs")
+    mkpath(joinpath(HomeDir, "outputs"))
 
     # Load target data
     data = readdlm(joinpath(path_target, target_file), comments=true)
@@ -58,7 +69,7 @@ function main()
         binhigh = binhigh - 1
         println("Adjusted binhigh to $binhigh")
     end
-    save_gr_data(r_values, full_target_gr, "gr_target.dat")
+    save_gr_data(r_values, full_target_gr, joinpath(HomeDir, "outputs/gr_target.dat"))
 
     gr_target = @view full_target_gr[binlow:binhigh]
     gr_current = copy(gr_target)
@@ -85,7 +96,7 @@ function main()
     
     # Initialize tracking
     start_time = time()
-    convergence_file = "outputs/convergence_data.dat"
+    convergence_file = joinpath(HomeDir, "outputs/convergence_data.dat")
     initialize_convergence_file(convergence_file)
     
     # Main optimization loop
@@ -109,7 +120,7 @@ function main()
         # Rescale gr
         gr_current = @view gr_normalized[binlow:binhigh]
         g_min = minimum(gr_current)
-        save_iteration_data(iteration, r_range, gr_current, βu_current, f_current)
+        save_iteration_data(iteration, r_range, gr_current, βu_current, f_current, HomeDir)
 
         # Check convergence
         error, iteration_diff, potential_increase = compute_convergence_metrics(gr_current, gr_target, gr_old)
@@ -122,7 +133,7 @@ function main()
         if error < target_tol || iteration_diff < iteration_tol
             @info "Convergence achieved" iteration=iteration
 
-            save_gr_data(r_values, gr_normalized, "gr_final.dat")
+            save_gr_data(r_values, gr_normalized, joinpath(HomeDir, "outputs/gr_final.dat"))
             break
         end
 
@@ -132,8 +143,8 @@ function main()
     end
     
     # Save final target data
-    save_target_data(r_range, gr_target, βu_target, f_target)
-    cp("inputs/params.json", "outputs/00params.json", force=true)
+    save_target_data(r_range, gr_target, βu_target, f_target, joinpath(HomeDir, "outputs/iteration_-1.dat"))
+    cp(joinpath(HomeDir, "inputs/params.json"), joinpath(HomeDir, "outputs/00params.json"), force=true)
     @info "Optimization completed in $(time() - start_time) seconds"
 end
 

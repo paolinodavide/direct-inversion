@@ -91,17 +91,17 @@ function append_convergence_data(filename, iteration, elapsed_time, error, itera
     end
 end
 
-function save_iteration_data(iteration, r_range, gr_current, βu_current, f_current)
+function save_iteration_data(iteration, r_range, gr_current, βu_current, f_current, home_dir::String)
     output_data = hcat(collect(r_range), gr_current, βu_current, f_current)
-    open("outputs/iteration_$iteration.dat", "w") do io
+    open(joinpath(home_dir, "outputs/iteration_$iteration.dat"), "w") do io
         write(io, "# r\tgr\tu\tf/r\n")
         writedlm(io, output_data)
     end
 end
 
-function save_target_data(r_range, gr_target, βu_target, f_target)
+function save_target_data(r_range, gr_target, βu_target, f_target, filename::String = "outputs/iteration_-1.dat")
     output_data = hcat(collect(r_range), gr_target, βu_target, f_target)
-    open("outputs/iteration_-1.dat", "w") do io
+    open(filename, "w") do io
         write(io, "# r\tgr\tu\tf/r\n")
         writedlm(io, output_data)
     end
@@ -109,7 +109,7 @@ end
 
 function save_gr_data(r_range, gr_data, filename)
     output_data = hcat(collect(r_range), gr_data)
-    open("outputs/$filename", "w") do io
+    open(filename, "w") do io
         write(io, "# r\tgr\n")
         writedlm(io, output_data)
     end

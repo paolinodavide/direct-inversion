@@ -7,6 +7,7 @@ from scipy.spatial.distance import pdist
 import matplotlib.pyplot as plt
 from numba import njit
 import sys
+import argparse
 
 def find_lj_config_files(directory='./configs/', pattern='*.dat'):
     """Find all LJ configuration files in the directory"""
@@ -135,27 +136,36 @@ def process_file(args):
     return rdf_from_file(file, dr) 
 
 def main():
-    if len(sys.argv) > 1:
-        dr = float(sys.argv[1])
-    else:
-        print("Usage: python gr_histo_davide.py <dr> ")
-        sys.exit(1)
-    
+    parser = argparse.ArgumentParser(description="Calculate RDFs from configuration files")
+    parser.add_argument(
+        "--directory", "-d",
+        type=str,
+        required=True,
+        help="The required home directory prefix where 'inputs' and 'outputs' will be created"
+    )
+    parser.add_argument(
+        "--dr", "-r",
+        type=float,
+        default=0.002,
+        help="Bin width for RDF calculation (default: 0.002)"
+    )
+    args = parser.parse_args()
+
     # Find all files to process
-    inputs_path = "./inputs/"
-    output_path = "./outputs/"
+    inputs_path = os.path.join(args.directory, "inputs/")
+    output_path = os.path.join(args.directory, "outputs/")
     os.makedirs(output_path, exist_ok=True)
     os.makedirs(output_path+'/rdfs/', exist_ok=True)
     files = find_lj_config_files(inputs_path+"configs/")
     if not files:
-        print("No LJ config files found in ./configs/")
+        print(f"No LJ config files found in {inputs_path}configs/")
         return
     
     print(f"Found {len(files)} files to process")
     
     # Process in parallel with progress bar
     with Pool() as pool:
-        results = list(tqdm(pool.imap(process_file, [(file, dr) for file in files]), 
+        results = list(tqdm(pool.imap(process_file, [(file, args.dr) for file in files]), 
                                   total=len(files),
                                   desc="Processing RDFs"))
 
