@@ -16,7 +16,7 @@ def find_lj_config_files(directory='./configs/', pattern='*.dat'):
     files.sort(key=lambda x: int(x.split('_')[-1].split('.')[0]))
     return files
 
-def rdf_from_file(filename, dr, r_max=10):
+def rdf_from_file(filename, dr, r_max=10, output_folder='outputs/rdfs/'):
     """Process a single file to calculate RDF"""
     try:
         with open(filename, 'r') as f:
@@ -37,7 +37,7 @@ def rdf_from_file(filename, dr, r_max=10):
 
         # Save results
         file_num = os.path.basename(filename).split('_')[1].split('.')[0]
-        output_folder = 'outputs/rdfs/'
+        
         os.makedirs(output_folder, exist_ok=True)
         
         output_filename = f'{output_folder}/g_r_lj_{file_num}.dat'
@@ -132,8 +132,8 @@ def calculate_rdf_numba(positions, box_size, dr=0.02, r_max=10):
     return r, g_r
 
 def process_file(args):
-    file, dr = args
-    return rdf_from_file(file, dr) 
+    file, dr, folder = args
+    return rdf_from_file(file, dr, r_max=10, output_folder=folder)
 
 def main():
     parser = argparse.ArgumentParser(description="Calculate RDFs from configuration files")
@@ -165,7 +165,7 @@ def main():
     
     # Process in parallel with progress bar
     with Pool() as pool:
-        results = list(tqdm(pool.imap(process_file, [(file, args.dr) for file in files]), 
+        results = list(tqdm(pool.imap(process_file, [(file, args.dr, output_path+'/rdfs/') for file in files]), 
                                   total=len(files),
                                   desc="Processing RDFs"))
 
@@ -182,7 +182,7 @@ def main():
         np.savetxt(output_path+'/rdfs/g_r_h_avg.dat', 
                   np.column_stack((r, g_total, var_g)),
                   header='# r g(r) var_g(r)')
-        print("All files processed successfully")
+        print(f"All files processed successfully in {output_path}")
     else:
         print("No valid results were generated")
     
