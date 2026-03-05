@@ -7,6 +7,7 @@ from multiprocessing import Pool
 import glob
 from numba import njit
 import matplotlib.pyplot as plt
+import argparse
 
 def find_config_files(directory='./configs/', pattern='*.dat'):
     """Find all LJ configuration files in the directory"""
@@ -44,12 +45,21 @@ def minDistance_from_file(file_path, dim=2):
     return file_number, min_distance
 
 def main():
-    inputs_path = "./inputs/"
-    output_path = "./outputs/"
+    parser = argparse.ArgumentParser(description="Calculate minimum distances from configurations")
+    parser.add_argument(
+        "--directory", "-d",
+        type=str,
+        required=True,
+        help="The required home directory prefix where 'inputs' and 'outputs' will be created"
+    )
+    args = parser.parse_args()
+
+    inputs_path = os.path.join(args.directory, "inputs/")
+    output_path = os.path.join(args.directory, "outputs/")
     os.makedirs(output_path, exist_ok=True)
     files = find_config_files(inputs_path+"configs/")
     if not files:
-        print("No config files found in ./configs/")
+        print(f"No config files found in {inputs_path}configs/")
         return
 
     print(f"Found {len(files)} files to process")

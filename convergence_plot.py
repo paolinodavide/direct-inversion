@@ -2,9 +2,19 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import argparse
+
+parser = argparse.ArgumentParser(description="Plot convergence data for forceIBI")
+parser.add_argument(
+    "--directory", "-d",
+    type=str,
+    required=True,
+    help="The required home directory prefix where 'inputs' and 'outputs' will be created"
+)
+args = parser.parse_args()
 
 # --- Configuration ---
-Path = './outputs/'
+Path = os.path.join(args.directory, "outputs/")  # Directory containing iteration_*.dat files and convergence_data.dat
 iterations_prefix = 'iteration_'
 
 plt.rcParams.update({

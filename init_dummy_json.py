@@ -1,8 +1,18 @@
 import json
 import os
+import argparse
+
+parser = argparse.ArgumentParser(description="Initialize dummy params.json for forceIBI")
+parser.add_argument(
+    "--directory", "-d",
+    type=str, 
+    required=True,  # This makes the flag mandatory
+    help="The required home directory prefix where 'inputs' will be created"
+)
+args = parser.parse_args()
 
 # Create the inputs directory if it doesn't exist
-os.makedirs("inputs", exist_ok=True)
+os.makedirs(os.path.join(args.directory, "inputs"), exist_ok=True)
 
 # Define the dummy parameters
 params = {
@@ -31,9 +41,9 @@ params = {
 }
 
 # Write to JSON file
-if os.path.exists("inputs/params.json"):
+if os.path.exists(os.path.join(args.directory, "inputs/params.json")):
     print("File inputs/params.json already exists. Stopping.")
 else:
-    with open("inputs/params.json", "w") as f:
+    with open(os.path.join(args.directory, "inputs/params.json"), "w") as f:
         json.dump(params, f, indent=2)
-    print("Created inputs/params.json")
+    print(f"Created {os.path.join(args.directory, 'inputs/params.json')} with dummy parameters.")
