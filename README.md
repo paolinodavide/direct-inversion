@@ -4,54 +4,47 @@ This project implements Iterative Boltzmann Inversion (IBI) by exploiting the fo
 
 > ⚠️ **Note:** This repository is for personal use. Dependencies and environment setup are assumed to be manually managed.  
 ---
+---
 # ⚙️ Usage Guide
 ## Quick Start for Main Inversion
 
-If you're already familiar with the setup process, you can jump directly to running the main inversion routine:
-
-1. Ensure your parameter file `./inputs/params.json` is properly configured.
+1. Ensure your parameter file is configured at `<YOUR_DIR>/inputs/params.json`.
 2. Execute the following command from the project root:
     ```bash
-    julia -t auto forceIBI/grinter_parallel.jl
+    julia -t auto forceIBI/grinter_parallel.jl --directory <YOUR_DIR>
     ```
-3. The results will be saved in the `./outputs/` directory for further analysis.
 
-For detailed steps, refer to the sections below.
 ## Full Workflow
 ### 1. Prepare Input Configurations
-Place your configuration files in the `./inputs/configs/` directory. These files will serve as the starting point for the inversion process.
+Place your configuration files in the `<YOUR_DIR>/inputs/configs/` directory.
 
 ### 2. Generate Targets for Inversion
-Run the following scripts from the project root to prepare the target data for the inversion:
+Run the following scripts from the project root, providing your data directory with the `-d` flag:
 
 1. Minimize the input data:
     ```bash
-    python3 forceIBI/min_d.py
+    python3 forceIBI/min_d.py -d <YOUR_DIR>
     ```
 
 2. Create histograms for the radial distribution function (RDF):
     ```bash
-    python3 forceIBI/gr_histo.py <dr>
+    python3 forceIBI/gr_histo.py -d <YOUR_DIR>
     ```
-    Replace `<dr>` with the desired bin width for the RDF.
 
 3. Generate weighted target data:
     ```bash
-    python3 forceIBI/weighted_gen_target.py
+    python3 forceIBI/weighted_gen_tgt.py -d <YOUR_DIR>
     ```
 
 4. Create a dummy `.json` parameter file:
     ```bash
-    python3 init_dummy_json.py
+    python3 init_dummy_json.py -d <YOUR_DIR>
     ```
 
 ### 3. Run the Main Computation
-Edit the parameter file `./inputs/paramters.json`. 
-Execute the main iterative Boltzmann inversion routine using Julia:
+The inversion routine now looks for `inputs/params.json` relative to your provided directory:
 ```bash
-julia --project=forceIBI -t auto forceIBI/grinter_parallel.jl
-```
-This will perform the effective potential reconstruction. 
+julia --project=forceIBI -t auto forceIBI/grinter_parallel.jl --directory <YOUR_DIR>
 
 ### 4. Analyze and Visualize Results
 To plot and analyze the results, run:
