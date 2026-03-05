@@ -63,6 +63,9 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
             f_magnitude = if r_ij < r_min_interaction
                 if core_strength == 0
                     0.0
+                elseif core_strength == 1
+                    a = r_min_interaction / r_ij
+                    a * force_over_r[1] + a*(1-a)*inv_bin_width * (force_over_r[2] - force_over_r[1] + bin_width * force_over_r[1]/r_min_interaction)
                 else
                     force_over_r[1] * (r_min_interaction/r_ij)^core_strength
                 end
