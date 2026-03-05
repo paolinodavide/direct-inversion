@@ -19,11 +19,15 @@ struct Both <: IntegrationMethod end
     return separation - box_length * round(separation * inv_box_length)
 end
 
-@inline function pbc_distance(pos_i::SVector{D, Float64}, pos_j::SVector{D, Float64}, box_size::Float64) where D
+@inline function pbc_distance(pos_i::SVector{D, Float64}, pos_j::SVector{D, Float64}, box_sizes::SVector{D, Float64}) where D
     """Compute the minimum image distance vector between two positions under PBC."""
-    distance = pos_i - pos_j
-    distance -= box_size * round.(distance / box_size)
-    return distance, dot(distance, distance)
+    d = pos_i - pos_j
+
+    # "Map" compiles to a single CPU instruction loop. 
+    image = map((x, L) -> x - round(x / L) * L, d, box_sizes)
+
+    #d -= image # PBCs
+    return image, dot(image, image)
 end
 
 
@@ -71,6 +75,7 @@ end
     ) where D
     #fill!(borgis_contributions, 0.0)
     num_particles = length(positions)
+    box_sizes = fill(box_length, SVector{D, Float64})
     
     @inbounds for i in 1:num_particles-1
         pos_i = positions[i]
@@ -80,8 +85,8 @@ end
             pos_j = positions[j]
             force_j = total_forces[j]
             # Calculate distance once
-            rVec_ij, r2_ij = pbc_distance(pos_i, pos_j, box_length)
-            if r2_ij == 0.0 || r2_ij > (max_dist_sq) # Add a cutoff check if possible
+            rVec_ij, r2_ij = pbc_distance(pos_i, pos_j, box_sizes)
+            if  r2_ij > (max_dist_sq) # Add a cutoff check if possible
                 continue
             end
             
@@ -137,7 +142,9 @@ end
     core_strength::Int=0) where D
 
     num_particles = length(positions)
+    box_sizes = fill(box_length, SVector{D, Float64})
     inv_bin_width = 1.0 / bin_width
+    r_cut2 = r_cutoff_interaction^2
 
     @inbounds for i in 1:num_particles-1
         pos_i = positions[i]
@@ -145,8 +152,8 @@ end
         for j in i+1:num_particles
             pos_j = positions[j]
 
-            rVec_ij, r2_ij= pbc_distance(pos_i, pos_j, box_length)
-            if r2_ij == 0.0 || r2_ij > r_cutoff_interaction^2
+            rVec_ij, r2_ij= pbc_distance(pos_i, pos_j, box_sizes)
+            if r_cut2 < r2_ij
                 continue
             end
 
