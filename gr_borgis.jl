@@ -454,11 +454,22 @@ function gr_force_from_dir_parallel_binary(directory::String, box_length::Float6
     throw(ArgumentError("No binary files found in directory: $directory"))
     end
 
-    # Process files in parallel with binary reader
     results = ThreadsX.map(file_paths) do filepath
-    particle_positions = read_particle_positions_binary(filepath)  # or mmap version
-    grForce_notNorm_svectorized(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method; core_strength=core_strength)
+    try
+        particle_positions = read_particle_positions_binary(filepath)
+        res = grForce_notNorm_svectorized(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method; core_strength=core_strength)
+        
+        # Immediate NaN check
+        if any(isnan.(res))
+            @warn "NaN detected in file: $filepath. Replacing with zeros to save the average."
+            return zeros(Float64, num_bins)
+        end
+        return res
+    catch e
+        @error "Error processing $filepath: $e"
+        return zeros(Float64, num_bins)
     end
+end
 
     # Combine results (same as before)
     if method != "both"
