@@ -24,10 +24,10 @@ end
     d = pos_i - pos_j
 
     # "Map" compiles to a single CPU instruction loop. 
-    image = map((x, L) -> round(x / L) * L, d, box_sizes)
+    image = map((x, L) -> x - round(x / L) * L, d, box_sizes)
 
-    d -= image # PBCs
-    return d, dot(d, d)
+    #d -= image # PBCs
+    return image, dot(image, image)
 end
 
 
@@ -153,7 +153,7 @@ end
             pos_j = positions[j]
 
             rVec_ij, r2_ij= pbc_distance(pos_i, pos_j, box_sizes)
-            if r2_ij > r_cut2
+            if r_cut2 < r2_ij
                 continue
             end
 
