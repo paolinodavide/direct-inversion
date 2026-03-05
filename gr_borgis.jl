@@ -155,7 +155,7 @@ end
 
             #f_magnitude::Float64 = 0.0
             f_magnitude = if r_ij < r_min_interaction
-                force_magnitude_below_rmin(r_ij, r_min_interaction, force_over_r; core_strength=core_strength)
+                force_magnitude_below_rmin(r_ij, r_min_interaction, force_over_r, inv_bin_width; core_strength=core_strength)
             else
                 force_magnitude_between_bins(r_ij, r_min_interaction, r_cutoff_interaction, force_over_r, inv_bin_width)
             end
@@ -166,10 +166,11 @@ end
     end
 end
 
-@inline function force_magnitude_below_rmin(r_ij::Float64, r_min::Float64, force_over_r::Vector{Float64}; core_strength::Int=0)::Float64
+@inline function force_magnitude_below_rmin(r_ij::Float64, r_min::Float64, force_over_r::Vector{Float64}, inv_bin_width::Float64; core_strength::Int=0)::Float64
     if core_strength == 0
         return 0.0
     elseif core_strength == 1
+        bin_width = 1.0 / inv_bin_width
         a = r_min / r_ij
         return a * force_over_r[1] + a*(1-a)*inv_bin_width * (force_over_r[2] - force_over_r[1] + bin_width * force_over_r[1]/r_min)
     else
