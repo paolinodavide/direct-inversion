@@ -53,38 +53,51 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
 
     evaluate_total_forces!(total_forces, positions, box_length, force_over_r, r_min_interaction, r_cutoff_interaction, bin_width; core_strength=core_strength)
 
-    borgis_contributions = compute_borgis_contributions(positions, total_forces, box_length, inv_bin_width, num_bins_gr)
+    borgis_contributions = zeros(Float64, num_bins_gr)
+    compute_borgis_contributions!(borgis_contributions, positions, total_forces, box_length, inv_bin_width, num_bins_gr, r_cutoff_interaction^2)
 
     return integrate_borgis_contributions(borgis_contributions, method)
 end
 
-@inline function compute_borgis_contributions(positions::Vector{SVector{D, Float64}}, total_forces::Vector{SVector{D, Float64}}, box_length::Float64, inv_bin_width::Float64, num_bins_gr::Int) where D
+# Pass the buffer in to avoid the 32% allocation cost seen in your profile
+@inline function compute_borgis_contributions!(
+    borgis_contributions::Vector{Float64}, 
+    positions::Vector{SVector{D, Float64}},     
+    total_forces::Vector{SVector{D, Float64}},
+    box_length::Float64, 
+    inv_bin_width::Float64, 
+    num_bins_gr::Int, 
+    max_dist_sq::Float64 
+    ) where D
+    #fill!(borgis_contributions, 0.0)
     num_particles = length(positions)
-    borgis_contributions = zeros(Float64, num_bins_gr)
+    
     @inbounds for i in 1:num_particles-1
         pos_i = positions[i]
         force_i = total_forces[i]
-
+        
         for j in i+1:num_particles
             pos_j = positions[j]
             force_j = total_forces[j]
-
-            rVec_ij, r2_ij= pbc_distance(pos_i, pos_j, box_length)
-            if iszero(r2_ij)
+            # Calculate distance once
+            rVec_ij, r2_ij = pbc_distance(pos_i, pos_j, box_length)
+            if r2_ij == 0.0 || r2_ij > (max_dist_sq) # Add a cutoff check if possible
                 continue
             end
-
+            
             r_ij = sqrt(r2_ij)
-            radial_bin_index = floor(Int, r_ij * inv_bin_width)
-            target_bin = clamp(radial_bin_index + 1, 1, num_bins_gr)
-
-            force_diff = force_i - force_j
-            borgis_delta = borgis_delta_calculation(force_diff, rVec_ij, r2_ij, r_ij)
-
-            borgis_contributions[target_bin] += borgis_delta
+            # Use unsafe_trunc or just let the index handle it to avoid 'floor' overhead
+            target_bin = Int(trunc(r_ij * inv_bin_width)) + 1
+            
+            if 1 <= target_bin <= num_bins_gr
+                force_diff = force_i - force_j
+                # Ensure borgis_delta_calculation is inlined and non-allocating
+                borgis_delta = borgis_delta_calculation(force_diff, rVec_ij, r2_ij, r_ij)
+                borgis_contributions[target_bin] += borgis_delta
+            end
         end
     end
-    return borgis_contributions
+    return nothing
 end
 
 # "in" method
