@@ -52,6 +52,7 @@ function main()
     target_tol = params["target_precision"]::Float64
     iteration_tol = params["iteration_precision"]::Float64
     method_force_formula = params["method_force_formula"]::String
+    method_type = get_method_type(method_force_formula)
     core_strength = params["core_strength"]::Int
     shift_gr = params["shift_gr"]::Bool
 
@@ -61,7 +62,13 @@ function main()
     # Load target data
     data = readdlm(joinpath(path_target, target_file), comments=true)
     r_values, full_target_gr = data[:, 1], data[:, 2]
-    r_range = r_low:bin_width:r_high
+    binlow = findfirst(r -> r >= r_low, r_values)
+    binhigh = findlast(r -> r <= r_high, r_values)
+    r_low = r_values[binlow]
+    r_high = r_values[binhigh]
+
+    # Then define r_range based on what you actually extracted
+    r_range = r_values[binlow:binhigh]
     #print length r range and r_Values[binlow:binhigh]
     if length(r_range) != length(r_values[binlow:binhigh])
         @warn "Mismatch in r_range length and target g(r) range length"
@@ -106,10 +113,14 @@ function main()
         # βu_t → gr_t
         gr_notNorm, _ = gr_force_from_dir_parallel_binary(
             config_dir, L_box, bin_width, num_bins_gr, 
-            f_current, r_low, r_high, method_force_formula; 
+            f_current, r_low, r_high, method_type;
             core_strength=core_strength
         )
-        
+        if any(isnan.(gr_notNorm))
+            @error "Invalid g(r) values detected. Check force calculations and consider increasing r_low."
+            exit(1)
+        end
+
         # Normalize and update gr
         if method_force_formula == "out"
             gr_normalized = 1.0 .- gr_notNorm ./ prefactor
@@ -149,7 +160,18 @@ function main()
 end
 
 
-function update_potential!(βu_t, gr_t, gr_tgt, learning_rate, correct_offset::Bool=false; small_number::Float64=1e-10)
+function update_potential!(
+    βu_t::AbstractVector{Float64}, 
+    gr_t::AbstractVector{Float64}, 
+    gr_tgt::AbstractVector{Float64}, 
+    learning_rate::Float64, 
+    correct_offset::Bool=false; 
+    small_number::Float64=1e-10)
+    # Ensure all vectors have the same dimensions
+    if !(length(βu_t) == length(gr_t) == length(gr_tgt))
+        throw(DimensionMismatch("Vectors βu_t, gr_t, and gr_tgt must have the same length."))
+    end
+
     min_index = findmin(gr_t)[2]
     g_min = gr_t[min_index]
     Delta = 0.0
@@ -159,7 +181,7 @@ function update_potential!(βu_t, gr_t, gr_tgt, learning_rate, correct_offset::B
 
     @. gr_t = gr_t - Delta 
     if minimum(gr_t) < 0 || any(isnan.(gr_t))
-        @error "Negative g(r). Retry with higher r_low"
+        @error "Negative g(r) or NaN detected. Retry with higher r_low"
         exit(1)
     end
 
