@@ -154,7 +154,7 @@ function update_potential!(βu_t, gr_t, gr_tgt, learning_rate, correct_offset::B
     g_min = gr_t[min_index]
     Delta = 0.0
     if correct_offset
-        Delta = g_min - gr_tgt[min_index] 
+        Delta = g_min - gr_tgt[min_index] - small_number
     end
 
     @. gr_t = gr_t - Delta 
@@ -163,7 +163,7 @@ function update_potential!(βu_t, gr_t, gr_tgt, learning_rate, correct_offset::B
         exit(1)
     end
 
-    @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt + small_number)
+    @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt)
     βu_t .-= βu_t[end]  
 end
 
