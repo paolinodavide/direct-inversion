@@ -52,6 +52,7 @@ function main()
     target_tol = params["target_precision"]::Float64
     iteration_tol = params["iteration_precision"]::Float64
     method_force_formula = params["method_force_formula"]::String
+    method_type = get_method_type(method_force_formula)
     core_strength = params["core_strength"]::Int
     shift_gr = params["shift_gr"]::Bool
 
@@ -112,7 +113,7 @@ function main()
         # βu_t → gr_t
         gr_notNorm, _ = gr_force_from_dir_parallel_binary(
             config_dir, L_box, bin_width, num_bins_gr, 
-            f_current, r_low, r_high, method_force_formula; 
+            f_current, r_low, r_high, method_type;
             core_strength=core_strength
         )
         if any(isnan.(gr_notNorm))

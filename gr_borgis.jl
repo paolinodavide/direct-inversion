@@ -8,6 +8,12 @@ using DelimitedFiles
 using LinearAlgebra
 using Plots
 
+abstract type IntegrationMethod end
+struct In <: IntegrationMethod end
+struct Out <: IntegrationMethod end
+struct Both <: IntegrationMethod end
+
+
 @inline function wrap_pbc_distances(separation::Float64, box_length::Float64, inv_box_length::Float64)::Float64
     """Apply minimum image convention for periodic boundary conditions."""
     return separation - box_length * round(separation * inv_box_length)
@@ -35,57 +41,27 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
     force_over_r::Vector{Float64},
     r_min_interaction::Float64,
     r_cutoff_interaction::Float64,
-    method::String="out";
+    method::IntegrationMethod;
     core_strength::Int=13) where D
     
     num_particles, num_dimensions = size(particle_positions)
     inv_bin_width = 1.0 / bin_width
 
     positions = [SVector{D, Float64}(particle_positions'[:, i]) for i in 1:num_particles]
-    total_forces = [SVector{D, Float64}(zeros(num_dimensions)) for _ in 1:num_particles]
+    total_forces = zeros(SVector{D, Float64}, num_particles)
     #println("Converted pos to SVectors")
 
-    @inbounds for i in 1:num_particles
-        pos_i = positions[i]
+    evaluate_total_forces!(total_forces, positions, box_length, force_over_r, r_min_interaction, r_cutoff_interaction, bin_width; core_strength=core_strength)
 
-        for j in i+1:num_particles
-            pos_j = positions[j]
+    borgis_contributions = compute_borgis_contributions(positions, total_forces, box_length, inv_bin_width, num_bins_gr)
 
-            rVec_ij, r2_ij= pbc_distance(pos_i, pos_j, box_length)
-            if r2_ij == 0.0 || r2_ij > r_cutoff_interaction^2
-                continue
-            end
+    return integrate_borgis_contributions(borgis_contributions, method)
+end
 
-            r_ij = sqrt(r2_ij)
-
-
-            #f_magnitude::Float64 = 0.0
-            f_magnitude = if r_ij < r_min_interaction
-                if core_strength == 0
-                    0.0
-                elseif core_strength == 1
-                    a = r_min_interaction / r_ij
-                    a * force_over_r[1] + a*(1-a)*inv_bin_width * (force_over_r[2] - force_over_r[1] + bin_width * force_over_r[1]/r_min_interaction)
-                else
-                    force_over_r[1] * (r_min_interaction/r_ij)^core_strength
-                end
-                #force_over_r[1] + (r_ij - r_min) * inv_bin_width * (force_over_r[2] - force_over_r[1])
-                #force_over_r[1] * (r_min/r_ij)^core_strength
-            else
-                radial_bin_index = floor(Int, r_ij * inv_bin_width)
-                force_table_index = radial_bin_index - floor(Int, r_min_interaction * inv_bin_width) + 1
-                interpolation_weight = r_ij * inv_bin_width - radial_bin_index
-                (1.0 - interpolation_weight) * force_over_r[force_table_index] + interpolation_weight * force_over_r[force_table_index+1]
-            end
-
-            total_forces[i] += f_magnitude * rVec_ij
-            total_forces[j] -= f_magnitude * rVec_ij
-        end
-    end
-
-
+@inline function compute_borgis_contributions(positions::Vector{SVector{D, Float64}}, total_forces::Vector{SVector{D, Float64}}, box_length::Float64, inv_bin_width::Float64, num_bins_gr::Int) where D
+    num_particles = length(positions)
     borgis_contributions = zeros(Float64, num_bins_gr)
-    @inbounds for i in 1:num_particles
+    @inbounds for i in 1:num_particles-1
         pos_i = positions[i]
         force_i = total_forces[i]
 
@@ -103,35 +79,96 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
             target_bin = clamp(radial_bin_index + 1, 1, num_bins_gr)
 
             force_diff = force_i - force_j
-            borgis_delta = if num_dimensions == 2
-                dot(force_diff, rVec_ij) / r2_ij
-            elseif num_dimensions == 3
-                dot(force_diff, rVec_ij) / (r2_ij * r_ij)
-            else
-                dot(force_diff, rVec_ij) / r_ij^num_dimensions
-            end
+            borgis_delta = borgis_delta_calculation(force_diff, rVec_ij, r2_ij, r_ij)
 
             borgis_contributions[target_bin] += borgis_delta
         end
     end
+    return borgis_contributions
+end
 
-    # Phase 3: Compute cumulative integral based on method
-    if method == "in"
-        # Cumulative integral from r_min outward
-        cumsum!(borgis_contributions, borgis_contributions)
-        return borgis_contributions
-    elseif method == "out"
-        # Cumulative integral from r_cutoff inward  
-        reverse!(borgis_contributions)
-        cumsum!(borgis_contributions, borgis_contributions)
-        reverse!(borgis_contributions)
-        return borgis_contributions
-    elseif method == "both"
-        # Return the raw integrand
-        return borgis_contributions
-    else
-        throw(ArgumentError("Invalid integration method. Choose 'in', 'out', or 'both'."))
+# "in" method
+@inline function integrate_borgis_contributions(contributions::Vector{Float64}, ::In)
+    cumsum!(contributions, contributions)
+end
+
+# "out" method
+@inline function integrate_borgis_contributions(contributions::Vector{Float64}, ::Out)
+    reverse!(contributions)
+    cumsum!(contributions, contributions)
+    reverse!(contributions)
+end
+
+# "both" method (identity)
+@inline function integrate_borgis_contributions(contributions::Vector{Float64}, ::Both)
+    return contributions
+end
+
+# 2D Specialization
+@inline function borgis_delta_calculation(force_diff::SVector{2, Float64}, rVec_ij::SVector{2, Float64}, r2_ij::Float64, r_ij::Float64)::Float64  
+    return dot(force_diff, rVec_ij) / r2_ij
+end
+@inline function borgis_delta_calculation(force_diff::SVector{3, Float64}, rVec_ij::SVector{3, Float64}, r2_ij::Float64, r_ij::Float64)::Float64
+    return dot(force_diff, rVec_ij) / (r2_ij * r_ij)
+end
+@inline function borgis_delta_calculation(force_diff::SVector{D, Float64}, rVec_ij::SVector{D, Float64}, r2_ij::Float64, r_ij::Float64)::Float64 where D
+    return dot(force_diff, rVec_ij) / (r_ij^D)
+end
+
+@inline function evaluate_total_forces!(total_forces::Vector{SVector{D, Float64}},
+    positions::Vector{SVector{D, Float64}},
+    box_length::Float64, force_over_r::Vector{Float64},
+    r_min_interaction::Float64, 
+    r_cutoff_interaction::Float64, 
+    bin_width::Float64;
+    core_strength::Int=0) where D
+
+    num_particles = length(positions)
+    inv_bin_width = 1.0 / bin_width
+
+    @inbounds for i in 1:num_particles-1
+        pos_i = positions[i]
+
+        for j in i+1:num_particles
+            pos_j = positions[j]
+
+            rVec_ij, r2_ij= pbc_distance(pos_i, pos_j, box_length)
+            if r2_ij == 0.0 || r2_ij > r_cutoff_interaction^2
+                continue
+            end
+
+            r_ij = sqrt(r2_ij)
+
+
+            #f_magnitude::Float64 = 0.0
+            f_magnitude = if r_ij < r_min_interaction
+                force_magnitude_below_rmin(r_ij, r_min_interaction, force_over_r; core_strength=core_strength)
+            else
+                force_magnitude_between_bins(r_ij, r_min_interaction, r_cutoff_interaction, force_over_r, inv_bin_width)
+            end
+
+            total_forces[i] += f_magnitude * rVec_ij
+            total_forces[j] -= f_magnitude * rVec_ij
+        end
     end
+end
+
+@inline function force_magnitude_below_rmin(r_ij::Float64, r_min::Float64, force_over_r::Vector{Float64}; core_strength::Int=0)::Float64
+    if core_strength == 0
+        return 0.0
+    elseif core_strength == 1
+        a = r_min / r_ij
+        return a * force_over_r[1] + a*(1-a)*inv_bin_width * (force_over_r[2] - force_over_r[1] + bin_width * force_over_r[1]/r_min)
+    else
+        return force_over_r[1] * (r_min/r_ij)^core_strength
+    end
+end
+
+@inline function force_magnitude_between_bins(r_ij::Float64, r_min::Float64, r_max::Float64, force_over_r::Vector{Float64}, inv_bin_width::Float64)::Float64
+    radial_bin_index = floor(Int, r_ij * inv_bin_width)
+    force_table_index = clamp(radial_bin_index - floor(Int, r_min * inv_bin_width) + 1, 1, length(force_over_r)-1)
+    interpolation_weight = r_ij * inv_bin_width - radial_bin_index
+    return (1.0 - interpolation_weight) * force_over_r[force_table_index] + interpolation_weight * force_over_r[force_table_index+1]
 end
 
 
@@ -435,7 +472,7 @@ end
 
 function gr_force_from_dir_parallel_binary(directory::String, box_length::Float64, r_bin::Float64, 
     num_bins::Int, force_div_r::Vector{Float64}, 
-    rlow::Float64, r_cut::Float64, method::String="out"; core_strength::Int=13)
+    rlow::Float64, r_cut::Float64, method::IntegrationMethod; core_strength::Int=13)
     """
     Optimized version using binary files
     """
@@ -455,24 +492,13 @@ function gr_force_from_dir_parallel_binary(directory::String, box_length::Float6
     end
 
     results = ThreadsX.map(file_paths) do filepath
-    try
         particle_positions = read_particle_positions_binary(filepath)
         res = grForce_notNorm_svectorized(particle_positions, box_length, r_bin, num_bins, force_div_r, rlow, r_cut, method; core_strength=core_strength)
-        
-        # Immediate NaN check
-        if any(isnan.(res))
-            @warn "NaN detected in file: $filepath. Replacing with zeros to save the average."
-            return zeros(Float64, num_bins)
-        end
         return res
-    catch e
-        @error "Error processing $filepath: $e"
-        return zeros(Float64, num_bins)
     end
-end
 
     # Combine results (same as before)
-    if method != "both"
+    if method != Both()
         borgis_gr_total = sum(results)
         file_count = length(file_paths)
         borgis_gr_average = borgis_gr_total ./ file_count
@@ -480,7 +506,7 @@ end
         squared_sum = sum(x -> x .^ 2, results)
         variance = squared_sum ./ file_count .- borgis_gr_average .^ 2
         return borgis_gr_average, variance
-    elseif method == "both"
+    elseif method == Both()
         # 1. Setup metadata
         sample_pos = read_particle_positions_binary(file_paths[1])
         N, dim = size(sample_pos)
@@ -533,6 +559,16 @@ end
         lambda0 = vcat(zeros(half_bins), ones(num_bins - half_bins))
         
         return grOpt_estimator, lambda0
+    end
+end
+
+# Map the string to the type
+function get_method_type(method::String)
+    if method == "in"    return In()
+    elseif method == "out"  return Out()
+    elseif method == "both" return Both()
+    else
+        throw(ArgumentError("Unknown method: $method"))
     end
 end
 
