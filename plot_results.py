@@ -1,9 +1,18 @@
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import argparse
 
+parser = argparse.ArgumentParser(description="Calculate minimum distances from configurations")
+parser.add_argument(
+    "--directory", "-d",
+    type=str,
+    required=True,
+    help="The required home directory prefix where 'inputs' and 'outputs' will be created"
+)
+args = parser.parse_args()
 
-Path = './outputs/'
+Path = os.path.join(args.directory, 'outputs')
 
 iterations_prefix = 'iteration_'
 
@@ -34,7 +43,7 @@ axs[1].set_ylabel(r'$\beta u(r)$')
 axs[1].legend()
 
 # Load convergence data
-iteration, _, err, iteration_diff, _, _ = np.loadtxt(os.path.join(Path, 'convergence_data.dat'), unpack=True)
+iteration, _, err, iteration_diff, _, _, _ = np.loadtxt(os.path.join(Path, 'convergence_data.dat'), unpack=True)
 
 # Configure the third subplot for Convergence
 axs[2].semilogy(iteration, err, label='Error')
@@ -45,5 +54,5 @@ axs[2].set_ylabel('Log Scale')
 axs[2].legend()
 
 plt.tight_layout()
-plt.savefig(Path + '00Convergence_plots.pdf', dpi=300)  
+plt.savefig(os.path.join(Path, '00Convergence_plots.pdf'), dpi=300)  
 plt.show()
