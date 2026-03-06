@@ -64,11 +64,11 @@ function main()
     r_values, full_target_gr = data[:, 1], data[:, 2]
     binlow = findfirst(r -> r >= r_low, r_values)
     binhigh = findlast(r -> r <= r_high, r_values)
-    r_low = r_values[binlow]
-    r_high = r_values[binhigh]
 
     # Then define r_range based on what you actually extracted
     r_range = r_values[binlow:binhigh]
+    r_low = r_range[1]
+    r_high = r_range[end]
     #print length r range and r_Values[binlow:binhigh]
     if length(r_range) != length(r_values[binlow:binhigh])
         @warn "Mismatch in r_range length and target g(r) range length"
@@ -82,13 +82,13 @@ function main()
     gr_current = copy(gr_target)
     
     # Initialize potentials
-    βu_target = get_potential_from_name(target_pot, T, r_low, r_high, bin_width)
+    βu_target = get_potential_from_name(target_pot, T, r_range)
     f_target = f_over_r_from_potential(βu_target, r_low, bin_width)
     
     βu_current = if initial_pot == "mean_force"
         - log.(abs.(gr_target))
     else
-        get_potential_from_name(initial_pot, T, r_low, r_high, bin_width)
+        get_potential_from_name(initial_pot, T, r_range)
     end
     βu_current .-= βu_current[end]
     f_current = f_over_r_from_potential(βu_current, r_low, bin_width)
@@ -131,6 +131,7 @@ function main()
         # Rescale gr
         gr_current = @view gr_normalized[binlow:binhigh]
         g_min = minimum(gr_current)
+        g_end = gr_current[end]
         save_iteration_data(iteration, r_range, gr_current, βu_current, f_current, HomeDir)
 
         # Check convergence
@@ -139,7 +140,7 @@ function main()
         @info "Iteration $iteration" error=error iteration_diff=iteration_diff potential_increase=potential_increase g_min=g_min delta=(gr_current[1] - delta_target)
         
         # Save iteration data      
-        append_convergence_data(convergence_file, iteration, time() - start_time, error, iteration_diff, potential_increase, delta_target, g_min)
+        append_convergence_data(convergence_file, iteration, time() - start_time, error, iteration_diff, potential_increase, g_end, g_min)
         
         if error < target_tol || iteration_diff < iteration_tol
             @info "Convergence achieved" iteration=iteration

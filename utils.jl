@@ -47,9 +47,8 @@ function wca_potential(x::Float64, T::Float64)::Float64
     end
 end
 
-function get_potential_from_name(name::String, T::Float64, r_low::Float64, r_high::Float64, bin_width)::Vector{Float64}
+function get_potential_from_name(name::String, T::Float64, radii::Vector{Float64})::Vector{Float64}
     """Choose the potential to initiate the iteration loop. Returns the potential as an array."""
-    radii = collect(r_low:bin_width:r_high)
     pot_list = zeros(Float64, length(radii))
 
     potential_function = Dict(
@@ -57,7 +56,7 @@ function get_potential_from_name(name::String, T::Float64, r_low::Float64, r_hig
         "lj_rep" => lj_rep,
         "lj_att" => lj_att,
         "lj_test" => lj_test,
-        "wca" => lj_full,
+        "wca" => wca_potential,
         "r3" => (x, T) -> 1.0 / T * x^(-3), 
         "sh" => shoulder_potential
     )

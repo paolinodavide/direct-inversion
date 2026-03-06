@@ -86,20 +86,15 @@ end
             force_j = total_forces[j]
             # Calculate distance once
             rVec_ij, r2_ij = pbc_distance(pos_i, pos_j, box_sizes)
-            if  r2_ij > (max_dist_sq) # Add a cutoff check if possible
-                continue
-            end
             
             r_ij = sqrt(r2_ij)
-            # Use unsafe_trunc or just let the index handle it to avoid 'floor' overhead
-            target_bin = Int(trunc(r_ij * inv_bin_width)) + 1
-            
-            if 1 <= target_bin <= num_bins_gr
-                force_diff = force_i - force_j
-                # Ensure borgis_delta_calculation is inlined and non-allocating
-                borgis_delta = borgis_delta_calculation(force_diff, rVec_ij, r2_ij, r_ij)
-                borgis_contributions[target_bin] += borgis_delta
-            end
+            radial_bin_index = floor(Int, r_ij * inv_bin_width)
+            target_bin = clamp(radial_bin_index + 1, 1, num_bins_gr)
+
+            force_diff = force_i - force_j
+            borgis_delta = borgis_delta_calculation(force_diff, rVec_ij, r2_ij, r_ij)
+
+            borgis_contributions[target_bin] += borgis_delta
         end
     end
     return nothing
