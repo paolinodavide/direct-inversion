@@ -78,7 +78,7 @@ ax_cbar.set_xlabel(r'$t$', labelpad=4, ha='left')
 # 5. Convergence Data (Panel C)
 try:
     it, _, err, it_diff, pot_increase, _, _ = np.loadtxt(os.path.join(Path, 'convergence_data.dat'), unpack=True)
-    ax_c.semilogy(it, err, label=r'MSE$(g_t, g_{\text{ref}})$', color=colors[25], linewidth=2)
+    ax_c.semilogy(it, err, label=r'MSE$(g_t, g_{\text{ref}})$', color=colors[num_files*2//3], linewidth=2)
     ax_c.semilogy(it, it_diff, label=r'MSE$(g_t, g_{t-1})$', color=colors[num_files*2//3], linewidth=2     )
     ax_c.semilogy(it, pot_increase, label=r'MSE$(\beta u_t, \beta u_{t-1})$', color=colors[num_files//3], linewidth=2)
     ax_c.legend(handlelength=1, frameon=True)
