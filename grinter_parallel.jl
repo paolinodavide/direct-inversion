@@ -30,7 +30,7 @@ function main()
     N_particles = params["N_particles"]::Int
     L_box = Float64(params["L_box"])
     dimensions = params["dimensions"]::Int
-    T = Float64(params["temperature"])
+    T = Float64(params["Temperature"])
 
     # Radial parameters
     r_low = params["r_low"]::Float64

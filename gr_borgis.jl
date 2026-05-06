@@ -60,7 +60,7 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
     evaluate_total_forces!(total_forces, positions, box_length, force_over_r, r_min_interaction, r_cutoff_interaction, bin_width; core_strength=core_strength)
 
     borgis_contributions = zeros(Float64, num_bins_gr)
-    compute_borgis_contributions!(borgis_contributions, positions, total_forces, box_length, inv_bin_width, num_bins_gr, r_cutoff_interaction^2)
+    compute_borgis_contributions!(borgis_contributions, positions, total_forces, box_length, inv_bin_width, num_bins_gr)
 
     return integrate_borgis_contributions(borgis_contributions, method)
 end
