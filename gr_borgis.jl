@@ -1,6 +1,5 @@
 using LoopVectorization
 using StaticArrays
-using Revise
 using Statistics
 using ThreadsX
 using JSON
@@ -13,14 +12,17 @@ struct In <: IntegrationMethod end
 struct Out <: IntegrationMethod end
 struct Both <: IntegrationMethod end
 
-
+"""
+Apply minum image convention to a separation vector given the box length and its inverse.
+"""
 @inline function wrap_pbc_distances(separation::Float64, box_length::Float64, inv_box_length::Float64)::Float64
-    """Apply minimum image convention for periodic boundary conditions."""
     return separation - box_length * round(separation * inv_box_length)
 end
 
+"""
+    Compute the minimum image distance vectore between two positions under PBC.
+"""
 @inline function pbc_distance(pos_i::SVector{D, Float64}, pos_j::SVector{D, Float64}, box_sizes::SVector{D, Float64}) where D
-    """Compute the minimum image distance vector between two positions under PBC."""
     d = pos_i - pos_j
 
     # "Map" compiles to a single CPU instruction loop. 
@@ -58,20 +60,21 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
     evaluate_total_forces!(total_forces, positions, box_length, force_over_r, r_min_interaction, r_cutoff_interaction, bin_width; core_strength=core_strength)
 
     borgis_contributions = zeros(Float64, num_bins_gr)
-    compute_borgis_contributions!(borgis_contributions, positions, total_forces, box_length, inv_bin_width, num_bins_gr, r_cutoff_interaction^2)
+    compute_borgis_contributions!(borgis_contributions, positions, total_forces, box_length, inv_bin_width, num_bins_gr)
 
     return integrate_borgis_contributions(borgis_contributions, method)
 end
 
-# Pass the buffer in to avoid the 32% allocation cost seen in your profile
+"""
+Compute contributions B_ij in the Borgis g(r) formula, which involves the relative forces and positions of particle pairs.
+"""
 @inline function compute_borgis_contributions!(
     borgis_contributions::Vector{Float64}, 
     positions::Vector{SVector{D, Float64}},     
     total_forces::Vector{SVector{D, Float64}},
     box_length::Float64, 
     inv_bin_width::Float64, 
-    num_bins_gr::Int, 
-    max_dist_sq::Float64 
+    num_bins_gr::Int
     ) where D
     #fill!(borgis_contributions, 0.0)
     num_particles = length(positions)
@@ -100,19 +103,14 @@ end
     return nothing
 end
 
-# "in" method
 @inline function integrate_borgis_contributions(contributions::Vector{Float64}, ::In)
     cumsum!(contributions, contributions)
 end
-
-# "out" method
 @inline function integrate_borgis_contributions(contributions::Vector{Float64}, ::Out)
     reverse!(contributions)
     cumsum!(contributions, contributions)
     reverse!(contributions)
 end
-
-# "both" method (identity)
 @inline function integrate_borgis_contributions(contributions::Vector{Float64}, ::Both)
     return contributions
 end
@@ -128,6 +126,9 @@ end
     return dot(force_diff, rVec_ij) / (r_ij^D)
 end
 
+"""
+Compute total force acting on each particle.
+"""
 @inline function evaluate_total_forces!(total_forces::Vector{SVector{D, Float64}},
     positions::Vector{SVector{D, Float64}},
     box_length::Float64, force_over_r::Vector{Float64},
@@ -174,7 +175,7 @@ end
     elseif core_strength == 1
         bin_width = 1.0 / inv_bin_width
         a = r_min / r_ij
-        return a * force_over_r[1] + a*(1-a)*inv_bin_width * (force_over_r[2] - force_over_r[1] + bin_width * force_over_r[1]/r_min)
+        return a * force_over_r[1] + a*(1-a)*inv_bin_width * r_min* ((force_over_r[3] - force_over_r[2]))
     else
         return force_over_r[1] * (r_min/r_ij)^core_strength
     end
@@ -185,134 +186,6 @@ end
     force_table_index = clamp(radial_bin_index - floor(Int, r_min * inv_bin_width) + 1, 1, length(force_over_r)-1)
     interpolation_weight = r_ij * inv_bin_width - radial_bin_index
     return (1.0 - interpolation_weight) * force_over_r[force_table_index] + interpolation_weight * force_over_r[force_table_index+1]
-end
-
-
-function grForce_notNorm(particle_positions::Matrix{Float64},
-    box_length::Float64,
-    bin_width::Float64,
-    num_bins::Int,
-    force_over_r::Vector{Float64},
-    r_min::Float64,
-    r_cutoff::Float64,
-    method::String="out")
-    num_particles, num_dimensions = size(particle_positions)
-    total_forces = zeros(Float64, num_particles, num_dimensions)
-    borgis_contributions = zeros(Float64, num_bins)
-
-    # Precompute cutoff and binning parameters
-    cutoff_squared = r_cutoff^2
-    inv_bin_width = 1.0 / bin_width
-    min_bin_skip = Int(floor(r_min * inv_bin_width))
-    inv_box_length = 1.0 / box_length
-
-    # Transpose positions for cache-efficient column-major access
-    positions_transposed = particle_positions'
-
-    # Phase 1: Compute net forces on all particles
-    @inbounds for particle_i in 1:num_particles
-        position_i = @view positions_transposed[:, particle_i]
-
-        for particle_j in (particle_i+1):num_particles
-            position_j = @view positions_transposed[:, particle_j]
-
-            # Compute minimum image separation with periodic boundary conditions
-            separation_squared = 0.0
-            @simd for dim in 1:num_dimensions
-                displacement = position_i[dim] - position_j[dim]
-                displacement = wrap_pbc_distances(displacement, box_length, inv_box_length)
-                separation_squared += displacement * displacement
-            end
-
-            # Skip particles outside cutoff or at same position
-            (separation_squared == 0.0 || separation_squared > cutoff_squared) && continue
-
-            interparticle_distance = sqrt(separation_squared)
-
-            # Interpolate force_over_r table
-            force_magnitude = if interparticle_distance < r_min
-                force_over_r[1] + (interparticle_distance - r_min) * inv_bin_width * (force_over_r[2] - force_over_r[1])
-            elseif interparticle_distance < r_cutoff
-                radial_bin_index = Int(floor(interparticle_distance * inv_bin_width))
-                force_table_index = radial_bin_index - min_bin_skip + 1
-                interpolation_weight = interparticle_distance * inv_bin_width - radial_bin_index
-                (1.0 - interpolation_weight) * force_over_r[force_table_index] + interpolation_weight * force_over_r[force_table_index+1]
-            else
-                0.0
-            end
-
-
-            # Apply forces to both particles (Newton's 3rd law)
-            @simd for dim in 1:num_dimensions
-                displacement = position_i[dim] - position_j[dim]
-                displacement = wrap_pbc_distances(displacement, box_length, inv_box_length)
-                total_forces[particle_i, dim] += force_magnitude * displacement
-                total_forces[particle_j, dim] -= force_magnitude * displacement
-            end
-        end
-    end
-
-    # Phase 2: Compute Borgis integrand contributions
-    @inbounds for particle_i in 1:num_particles
-        position_i = @view positions_transposed[:, particle_i]
-        force_on_i = @view total_forces[particle_i, :]
-
-        for particle_j in (particle_i+1):num_particles
-            position_j = @view positions_transposed[:, particle_j]
-            force_on_j = @view total_forces[particle_j, :]
-
-            # Compute separation vector and relative force
-            separation_squared = 0.0
-            force_dot_displacement = 0.0
-
-            @simd for dim in 1:num_dimensions
-                displacement = position_i[dim] - position_j[dim]
-                displacement = wrap_pbc_distances(displacement, box_length, inv_box_length)
-                separation_squared += displacement * displacement
-
-                # Compute relative force difference
-                relative_force = force_on_i[dim] - force_on_j[dim]
-                force_dot_displacement += relative_force * displacement
-            end
-
-            # Skip overlapping particles
-            (separation_squared == 0.0) && continue
-
-            interparticle_distance = sqrt(separation_squared)
-            radial_bin_index = Int(floor(interparticle_distance * inv_bin_width))
-
-            # Determine target bin with bounds checking
-            target_bin = clamp(radial_bin_index + 1, 1, num_bins)
-
-            # Compute Borgis delta function: ∇·F_irreducible component
-            if num_dimensions == 2
-                borgis_delta = force_dot_displacement / separation_squared
-            elseif num_dimensions == 3
-                borgis_delta = force_dot_displacement / (separation_squared * interparticle_distance)
-            else
-                borgis_delta = force_dot_displacement / interparticle_distance^num_dimensions
-            end
-            borgis_contributions[target_bin] += borgis_delta
-        end
-    end
-
-    # Phase 3: Compute cumulative integral based on method
-    if method == "in"
-        # Cumulative integral from r_min outward
-        cumsum!(borgis_contributions, borgis_contributions)
-        return borgis_contributions
-    elseif method == "out"
-        # Cumulative integral from r_cutoff inward  
-        reverse!(borgis_contributions)
-        cumsum!(borgis_contributions, borgis_contributions)
-        reverse!(borgis_contributions)
-        return borgis_contributions
-    elseif method == "both"
-        # Return the raw integrand
-        return borgis_contributions
-    else
-        throw(ArgumentError("Invalid integration method. Choose 'in', 'out', or 'both'."))
-    end
 end
 
 function lennard_jones_force_div_r(r, epsilon=1.0, sigma=1.0)

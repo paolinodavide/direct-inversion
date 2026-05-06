@@ -1,20 +1,24 @@
+#forceIBI/grinter_parallel.jl
 using JSON
 using DelimitedFiles
 using LinearAlgebra
-using Plots
-using Revise
 using ArgParse
 
 include("utils.jl")
 include("gr_borgis.jl")
 
+
+"""
+Run the inversion loop for the iterative Boltzmann inversion method.
+This function parses input parameters, loads target data, initializes potentials, and runs the inversion loop.
+"""
 function main()
     s = ArgParseSettings()
     @add_arg_table s begin
         "--directory", "-d"
-            help = "Directory containing input files (default: inputs)"
+            help = "Directory containing input folder with params.json and target g(r) file. Default is current directory."
             arg_type = String
-            default = "inputs"
+            default = "."
     end
     parsed_args = parse_args(s)
     HomeDir = parsed_args["directory"]
@@ -24,9 +28,9 @@ function main()
     
     # Extract parameters with clear grouping
     N_particles = params["N_particles"]::Int
-    L_box = params["L_box"]::Float64
+    L_box = Float64(params["L_box"])
     dimensions = params["dimensions"]::Int
-    T = params["Temperature"]::Float64
+    T = Float64(params["Temperature"])
 
     # Radial parameters
     r_low = params["r_low"]::Float64
@@ -48,12 +52,12 @@ function main()
     
     # Optimization parameters
     max_iter = params["max_iter"]::Int
-    learning_rate = params["learning_rate"]::Float64
-    target_tol = params["target_precision"]::Float64
-    iteration_tol = params["iteration_precision"]::Float64
+    learning_rate = Float64(params["learning_rate"])
+    target_tol = Float64(params["target_precision"])
+    iteration_tol = Float64(params["iteration_precision"])
     method_force_formula = params["method_force_formula"]::String
     method_type = get_method_type(method_force_formula)
-    core_strength = params["core_strength"]::Int
+    core_strength = Int(params["core_strength"]) #Default is Integer but can be Float. Adjust as needed.
     shift_gr = params["shift_gr"]::Bool
 
     # Create output directory
@@ -69,7 +73,6 @@ function main()
     r_range = r_values[binlow:binhigh]
     r_low = r_range[1]
     r_high = r_range[end]
-    #print length r range and r_Values[binlow:binhigh]
     if length(r_range) != length(r_values[binlow:binhigh])
         @warn "Mismatch in r_range length and target g(r) range length"
         println("binlow: $binlow, binhigh: $binhigh")
@@ -144,10 +147,11 @@ function main()
         
         if error < target_tol || iteration_diff < iteration_tol || iteration == max_iter
             @info "Convergence achieved" iteration=iteration
-
             save_gr_data(r_values, gr_normalized, joinpath(HomeDir, "outputs/gr_final.dat"))
+            
             break
         end
+        save_gr_data(r_values, gr_normalized, joinpath(HomeDir, "outputs/gr_$(iteration).dat"))
 
         # u_t → u_t+1
         update_potential!(βu_current, gr_current, gr_target, learning_rate, shift_gr)
@@ -160,7 +164,9 @@ function main()
     @info "Optimization completed in $(time() - start_time) seconds"
 end
 
-
+"""
+Updates the potential based on the current and target g(r) values using the Schommer update rule.
+"""
 function update_potential!(
     βu_t::AbstractVector{Float64}, 
     gr_t::AbstractVector{Float64}, 
@@ -190,15 +196,10 @@ function update_potential!(
     βu_t .-= βu_t[end]  
 end
 
-function compute_convergence_metrics(gr_current, gr_target, gr_old)
-    error = sum((gr_current .- gr_target).^2) / length(gr_target)
-    iteration_diff = sum((gr_current .- gr_old).^2) / length(gr_current)
-    potential_increase = sum((log.(abs.(gr_current ./ gr_target))).^2) / length(gr_current)
-    return error, iteration_diff, potential_increase
-end
-
+"""
+Computes force/r from the potential using finite differences.
+"""
 function f_over_r_from_potential(potential::Vector{Float64}, r_low::Float64, bin_width::Float64)::Vector{Float64}
-    """Computes force/r from the potential."""
     pot_length = length(potential)
     f_over_r = similar(potential)
 
@@ -208,18 +209,25 @@ function f_over_r_from_potential(potential::Vector{Float64}, r_low::Float64, bin
     end
 
     # 1. Handle the start (i = 1)
-    # r_start = r_low
-    # # Force = -dV/dr, then divide by r
-    # f_over_r[1] = -(-3.0 * potential[1] + 4.0 * potential[2] - potential[3]) / (2.0 * bin_width * r_start)
+    r_start = r_low
+    # Force = -dV/dr, then divide by r
+    f_over_r[1] = -(-3.0 * potential[1] + 4.0 * potential[2] - potential[3]) / (2.0 * bin_width * r_start)
 
-    # # ... [Loop for i in 2:pot_length-1 remains the same] ...
+    # 2. Handle the end (i = pot_length)
+    r_end = r_low + (pot_length - 1) * bin_width
+    f_over_r[end] = -(3.0 * potential[end] - 4.0 * potential[end-1] + potential[end-2]) / (2.0 * bin_width * r_end)
 
-    # # 2. Handle the end (i = pot_length)
-    # r_end = r_low + (pot_length - 1) * bin_width
-    # f_over_r[end] = -(3.0 * potential[end] - 4.0 * potential[end-1] + potential[end-2]) / (2.0 * bin_width * r_end)
-    f_over_r[1] = 2.0 * f_over_r[2] - f_over_r[3]
-    f_over_r[end] = 2.0 * f_over_r[end - 1] - f_over_r[end - 2]
     return f_over_r
+end
+
+"""
+Computes convergence metrics: error, iteration difference, and potential increase.
+"""
+function compute_convergence_metrics(gr_current, gr_target, gr_old)
+    error = sum((gr_current .- gr_target).^2) / length(gr_target)
+    iteration_diff = sum((gr_current .- gr_old).^2) / length(gr_current)
+    potential_increase = sum((log.(abs.(gr_current ./ gr_target))).^2) / length(gr_current)
+    return error, iteration_diff, potential_increase
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
