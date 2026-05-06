@@ -3,21 +3,33 @@
 # with one file for each dump time
 # Call this file from a .sh script to generate the appropriate directory
 
-import sys
 import os
+import sys
+import argparse
 import numpy as np
 
-# Give the name of the simulation file as an argument
-try:
-    sys.argv[1]
-except IndexError:
-    print("Error: Missing file name")
-    sys.exit(1)
+# Set up argument parsing to take -i (input) and -d (directory)
+parser = argparse.ArgumentParser(description="Parse LAMMPS dump and generate configs.")
+parser.add_argument("-i", "--input", required=True, help="Path to the LAMMPS simulation file")
+parser.add_argument("-d", "--directory", required=True, help="Output directory (<YOUR_DIR>)")
+args = parser.parse_args()
 
-simu_file = str(sys.argv[1])
+simu_file = args.input
+out_dir = os.path.join(args.directory, "inputs")  # Base output directory for all generated files
 
-# Common part of the file name
-prefix = simu_file.split('_')[0] + '_'
+# Define the dynamic paths based on your <YOUR_DIR>
+# Note: If these need to sit inside an "inputs" folder to match your README, 
+# you can change this to os.path.join(out_dir, "inputs", "configs")
+configs_dir = os.path.join(out_dir, "configs")
+configs_npy_dir = os.path.join(out_dir, "configs_npy") # Or configs_bin
+times_file_path = os.path.join(out_dir, "gr_wt.dat")
+
+# Ensure the base directory exists
+if not os.path.exists(out_dir):
+    os.makedirs(out_dir)
+
+# Common part of the file name (using basename to ignore directory paths if provided)
+prefix = os.path.basename(simu_file).split('_')[0] + '_'
 suffix = '.dat'
 
 List_column = []
@@ -33,8 +45,8 @@ simu_time = ''
 copy = False
 read_lbox = True
 
-#This block is only if the times have to be saved in a file
-save_times = open("gr_wt.dat", "w")
+# This block is only if the times have to be saved in a file
+save_times = open(times_file_path, "w")
 save_times.write("# Waiting times \n")
 
 while (index < len(List_column)):
@@ -61,7 +73,7 @@ while (index < len(List_column)):
             simu_time = List_column[index + 1][0]
             filename = prefix + simu_time + suffix
 
-            #This block is only if the times have to be saved in a file
+            # This block is only if the times have to be saved in a file
             save_times.write(simu_time + '\n')
 
             index += 1
@@ -72,9 +84,9 @@ while (index < len(List_column)):
             index += 3
         elif (List_column[index][1] == 'ATOMS'):
             copy = True
-            if not os.path.exists("./configs"):
-                os.makedirs("./configs")
-            save_results = open(f"./configs/{filename}", "w")
+            if not os.path.exists(configs_dir):
+                os.makedirs(configs_dir)
+            save_results = open(os.path.join(configs_dir, filename), "w")
             save_results.write('# x \t y \t l_box = ' + str(l_box) + '\n')
             index += 1
         else:
@@ -83,22 +95,22 @@ while (index < len(List_column)):
         index += 1
 
 save_times.close()
-print("Configs files created in ./configs")
+print(f"Configs files created in {configs_dir}")
 
 # Convert the .dat files to .npy files
 # Create the output directory if it doesn't exist
-if not os.path.exists("./configs_npy"):
-    os.makedirs("./configs_npy")
+if not os.path.exists(configs_npy_dir):
+    os.makedirs(configs_npy_dir)
 
-# Iterate through all .dat files in the ./configs directory and process them
-for file_name in filter(lambda f: f.endswith(".dat"), os.listdir("./configs")):
-    file_path = os.path.join("./configs", file_name)
+# Iterate through all .dat files in the configs directory and process them
+for file_name in filter(lambda f: f.endswith(".dat"), os.listdir(configs_dir)):
+    file_path = os.path.join(configs_dir, file_name)
     
     # Load data directly into a numpy array, skipping header lines
     data_array = np.loadtxt(file_path, comments="#", usecols=(0, 1))
     
     # Save the numpy array to a .npy file
-    npy_file_path = os.path.join("./configs_npy", file_name.replace(".dat", ".npy"))
+    npy_file_path = os.path.join(configs_npy_dir, file_name.replace(".dat", ".npy"))
     np.save(npy_file_path, data_array)
 
-print("Conversion to .npy files completed.")
+print(f"Conversion to .npy files completed. Saved in {configs_npy_dir}")

@@ -17,6 +17,13 @@ julia -t <NUM_THREADS or auto> forceIBI/grinter_parallel.jl -d <YOUR_DIR>
 ### 1. Prepare Input Configurations
 Place your configuration files in the `<YOUR_DIR>/inputs/configs/` directory.
 
+If you don't have any configurations ready, you can use the one provided in `forceIBI/examples/` as a template. 
+Run the following command to copy the example configuration to your working directory:
+```bash
+python3 format_data.py -i examples/lj_92_2.dat -d <YOUR_DIR>
+```
+This will create a `inputs/` folder in your specified directory with the necessary input structure.
+
 ### 2. Generate Targets for Inversion
 Run the following scripts from the project root, providing your data directory with the `-d` flag:
 
