@@ -1,6 +1,10 @@
-# 🥊 Force IBI Project
+# Direct Boltzmann inversion method from particle configurations at arbitrary state points
+This is the code repository for the article ["Direct Boltzmann inversion method from particle configurations at arbitrary state points"](https://doi.org/10.48550/arXiv.2603.12081) by Coquand, Paolino, Berthier.
+This is the code utilised to produce data and figures for the article, while a more recent version of the code is available at [https://github.com/paolinodavide/forceIBI.git](https://github.com/paolinodavide/forceIBI.git).
 
 This project implements Iterative Boltzmann Inversion (IBI) by exploiting the force formula proposed by Borgis et al. The code has been written to use Julia as the main computation engine for better performance, while maintaining Python for pre/post-processing.
+
+
 
 > ⚠️ **Note:** This repository is for personal use. Dependencies and environment setup are assumed to be manually managed.  
 ---
@@ -76,13 +80,14 @@ The pipeline is designed to be highly flexible. You can keep the repository code
 This is the structure of the provided codebase:
 ```text
 project-root/
-├── forceIBI/                # Core scripts and modules
+├── src/                # Core scripts and modules
 │   ├── gr_borgis.jl         # Main function for Borgis Formula implementation
 │   ├── grinter_parallel.jl  # Main potential inversion loop
 │   ├── utils.jl             # Auxiliary functions for the inversion loop
 │   ├── ...                  # Additional Julia modules
 │   └── *.py                 # Python files for pre- and post-processing
-├── init_dummy_json.py       # Helper script to initialize parameters
+├── examples/*         # Example input files for testing and demonstration
+│
 └── README.md                # This documentation
 ```
 
