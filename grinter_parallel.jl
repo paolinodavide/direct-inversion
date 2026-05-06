@@ -16,9 +16,9 @@ function main()
     s = ArgParseSettings()
     @add_arg_table s begin
         "--directory", "-d"
-            help = "Directory containing input files (default: inputs)"
+            help = "Directory containing input folder with params.json and target g(r) file. Default is current directory."
             arg_type = String
-            default = "inputs"
+            default = "."
     end
     parsed_args = parse_args(s)
     HomeDir = parsed_args["directory"]

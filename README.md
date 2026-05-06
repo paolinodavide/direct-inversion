@@ -1,18 +1,17 @@
 # 🥊 Force IBI Project
 
-This project implements Iterative Boltzmann Inversion (IBI) by exploiting the force formula proposed by Borgis et al. The code has been updated to use Julia as the main computation engine for better performance, while maintaining Python for pre/post-processing.
+This project implements Iterative Boltzmann Inversion (IBI) by exploiting the force formula proposed by Borgis et al. The code has been written to use Julia as the main computation engine for better performance, while maintaining Python for pre/post-processing.
 
 > ⚠️ **Note:** This repository is for personal use. Dependencies and environment setup are assumed to be manually managed.  
 ---
 ---
 # ⚙️ Usage Guide
 ## Quick Start for Main Inversion
+If your target directory is already fully prepared with configurations and a `params.json` file at `<YOUR_DIR>/inputs/params.json`, you can launch the inversion directly from the project root:
 
-1. Ensure your parameter file is configured at `<YOUR_DIR>/inputs/params.json`.
-2. Execute the following command from the project root:
-    ```bash
-    julia -t auto forceIBI/grinter_parallel.jl --directory <YOUR_DIR>
-    ```
+```bash
+julia -t <NUM_THREADS or auto> forceIBI/grinter_parallel.jl -d <YOUR_DIR>
+```
 
 ## Full Workflow
 ### 1. Prepare Input Configurations
@@ -28,7 +27,7 @@ Run the following scripts from the project root, providing your data directory w
 
 2. Create histograms for the radial distribution function (RDF):
     ```bash
-    python3 forceIBI/gr_histo.py -d <YOUR_DIR>
+    python3 forceIBI/gr_histo.py -d <YOUR_DIR> --dr <BIN_WIDTH>
     ```
 
 3. Generate weighted target data:
@@ -40,36 +39,53 @@ Run the following scripts from the project root, providing your data directory w
     ```bash
     python3 init_dummy_json.py -d <YOUR_DIR>
     ```
+5. Edit the generated `params.json` file to set the correct parameters for your inversion. If you don't know how, you can read the original article https://doi.org/10.48550/arXiv.2603.12081. 
 
 ### 3. Run the Main Computation
 The inversion routine now looks for `inputs/params.json` relative to your provided directory:
 ```bash
-julia --project=forceIBI -t auto forceIBI/grinter_parallel.jl --directory <YOUR_DIR>
+julia --project=forceIBI -t <NUM_THREADS or auto> forceIBI/grinter_parallel.jl -d <YOUR_DIR>
+```
 
 ### 4. Analyze and Visualize Results
 To plot and analyze the results, run:
 ```bash
-python3 forceIBI/plot_results.py
+python3 forceIBI/plot_results.py -d <YOUR_DIR>
 ```
+or 
+```bash
+python3 forceIBI/convergence_plot.py -d <YOUR_DIR>
+```
+
 The generated plots and data will be saved automatically in the `./outputs/` directory.
 
 ---
 
-## 📁 Folder Structure
-```
+## 📁 Directory Architecture
+
+The pipeline is designed to be highly flexible. You can keep the repository codebase in one location and run the inversion on **any external working directory** on your machine using the `-d` (Python) or `--directory` (Julia) flags. 
+
+### 1. Source Code Repository
+This is the structure of the provided codebase:
+```text
 project-root/
 ├── forceIBI/                # Core scripts and modules
-│   ├── gr_borgis.jl         # Contains the main function for Borgis Formula implementation
-│   ├── grinter_parallel.jl  # Contains the main potential inversion loop
+│   ├── gr_borgis.jl         # Main function for Borgis Formula implementation
+│   ├── grinter_parallel.jl  # Main potential inversion loop
 │   ├── utils.jl             # Auxiliary functions for the inversion loop
-|   ├── ...
-|   ├── *.py                 # All python files used for pre- and post-processing
-│   └── README.md            # This file
-|
+│   ├── ...                  # Additional Julia modules
+│   └── *.py                 # Python files for pre- and post-processing
+├── init_dummy_json.py       # Helper script to initialize parameters
+└── README.md                # This documentation
+```
+
+### 2. User Working Directory (```YOUR_DIR```)
+You must prepare a specific working directory for your data. When running the scripts, point them to this directory. The structure should look like this:
+```text
+<YOUR_DIR>/
 ├── inputs/                  
-│   ├── configs/             # Where configurations should be stored
-│   ├── configs_bin/         # Auto-generated directory with binary-converted input files
-│   └── params.json          # Params for the inversion
-|
-└── outputs/                 # Output directory (auto-generated)
+│   ├── configs/             # ⚠️ REQUIRED: Place your initial configuration files here
+│   ├── configs_bin/         # (Auto-generated) Binary-converted input files
+│   └── params.json          # (Auto-generated) Parameters for the inversion, to be edited by you
+└── outputs/                 # (Auto-generated) Results, output data, and plots
 ```
