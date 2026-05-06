@@ -144,10 +144,11 @@ function main()
         
         if error < target_tol || iteration_diff < iteration_tol || iteration == max_iter
             @info "Convergence achieved" iteration=iteration
-
             save_gr_data(r_values, gr_normalized, joinpath(HomeDir, "outputs/gr_final.dat"))
+            
             break
         end
+        save_gr_data(r_values, gr_normalized, joinpath(HomeDir, "outputs/gr_$(iteration).dat"))
 
         # u_t → u_t+1
         update_potential!(βu_current, gr_current, gr_target, learning_rate, shift_gr)
@@ -206,19 +207,24 @@ function f_over_r_from_potential(potential::Vector{Float64}, r_low::Float64, bin
         r = r_low + (i - 1) * bin_width
         f_over_r[i] = - (potential[i + 1] - potential[i - 1]) / (2.0 * bin_width * r)
     end
+    
+    # f_over_r[1] = - (potential[2] - potential[1]) / (bin_width * r_low)
+    # f_over_r[end] = - (potential[end] - potential[end - 1]) / (bin_width * (r_low + (pot_length - 1) * bin_width))
 
     # 1. Handle the start (i = 1)
-    # r_start = r_low
-    # # Force = -dV/dr, then divide by r
-    # f_over_r[1] = -(-3.0 * potential[1] + 4.0 * potential[2] - potential[3]) / (2.0 * bin_width * r_start)
+    r_start = r_low
+    # Force = -dV/dr, then divide by r
+    f_over_r[1] = -(-3.0 * potential[1] + 4.0 * potential[2] - potential[3]) / (2.0 * bin_width * r_start)
 
-    # # ... [Loop for i in 2:pot_length-1 remains the same] ...
+    # ... [Loop for i in 2:pot_length-1 remains the same] ...
 
-    # # 2. Handle the end (i = pot_length)
-    # r_end = r_low + (pot_length - 1) * bin_width
-    # f_over_r[end] = -(3.0 * potential[end] - 4.0 * potential[end-1] + potential[end-2]) / (2.0 * bin_width * r_end)
-    f_over_r[1] = 2.0 * f_over_r[2] - f_over_r[3]
-    f_over_r[end] = 2.0 * f_over_r[end - 1] - f_over_r[end - 2]
+    # 2. Handle the end (i = pot_length)
+    r_end = r_low + (pot_length - 1) * bin_width
+    f_over_r[end] = -(3.0 * potential[end] - 4.0 * potential[end-1] + potential[end-2]) / (2.0 * bin_width * r_end)
+
+    # f_over_r[1] = 2.0 * f_over_r[2] - f_over_r[3]
+    # f_over_r[end] = 2.0 * f_over_r[end - 1] - f_over_r[end - 2]
+
     return f_over_r
 end
 

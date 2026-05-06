@@ -174,7 +174,7 @@ end
     elseif core_strength == 1
         bin_width = 1.0 / inv_bin_width
         a = r_min / r_ij
-        return a * force_over_r[1] + a*(1-a)*inv_bin_width * (force_over_r[2] - force_over_r[1] + bin_width * force_over_r[1]/r_min)
+        return a * force_over_r[1] + a*(1-a)*inv_bin_width * r_min* ((force_over_r[3] - force_over_r[2]))
     else
         return force_over_r[1] * (r_min/r_ij)^core_strength
     end
