@@ -1,12 +1,9 @@
 # Direct Boltzmann inversion method from particle configurations at arbitrary state points
 This is the code repository for the article ["Direct Boltzmann inversion method from particle configurations at arbitrary state points"](https://doi.org/10.48550/arXiv.2603.12081) by Coquand, Paolino, Berthier.
-This is the code utilised to produce data and figures for the article, while a more recent version of the code is available at [https://github.com/paolinodavide/forceIBI.git](https://github.com/paolinodavide/forceIBI.git).
+This is the code utilised to produce data and figures for the article, while a more recent version of the code is available at [https://github.com/paolinodavide/direct-inversion.git](https://github.com/paolinodavide/direct-inversion.git).
 
-This project implements Iterative Boltzmann Inversion (IBI) by exploiting the force formula proposed by Borgis et al. The code has been written to use Julia as the main computation engine for better performance, while maintaining Python for pre/post-processing.
-
-
-
-> ⚠️ **Note:** This repository is for personal use. Dependencies and environment setup are assumed to be manually managed.  
+This projects builds a tool to reconstruct the interaction between particles starting from observations of the system. The main computation loop is written in Julia, while there are some Python scripts for pre- and post-processing. 
+ 
 ---
 ---
 # ⚙️ Usage Guide
@@ -21,7 +18,7 @@ julia -t <NUM_THREADS or auto> forceIBI/grinter_parallel.jl -d <YOUR_DIR>
 ### 1. Prepare Input Configurations
 Place your configuration files in the `<YOUR_DIR>/inputs/configs/` directory.
 
-If you don't have any configurations ready, you can use the one provided in `forceIBI/examples/` as a template. 
+If you don't have any configurations ready, you can use the one provided in `direct-inversion/examples/` as a template. 
 Run the following command to copy the example configuration to your working directory:
 ```bash
 python3 format_data.py -i examples/lj_92_2.dat -d <YOUR_DIR>
@@ -33,39 +30,39 @@ Run the following scripts from the project root, providing your data directory w
 
 1. Minimize the input data:
     ```bash
-    python3 forceIBI/min_d.py -d <YOUR_DIR>
+    python3 direct-inversion/min_d.py -d <YOUR_DIR>
     ```
 
 2. Create histograms for the radial distribution function (RDF):
     ```bash
-    python3 forceIBI/gr_histo.py -d <YOUR_DIR> --dr <BIN_WIDTH>
+    python3 direct-inversion/gr_histo.py -d <YOUR_DIR> --dr <BIN_WIDTH>
     ```
 
 3. Generate weighted target data:
     ```bash
-    python3 forceIBI/weighted_gen_tgt.py -d <YOUR_DIR>
+    python3 direct-inversion/weighted_gen_tgt.py -d <YOUR_DIR>
     ```
 
 4. Create a dummy `.json` parameter file:
     ```bash
-    python3 init_dummy_json.py -d <YOUR_DIR>
+    python3 direct-inversion/init_dummy_json.py -d <YOUR_DIR>
     ```
 5. Edit the generated `params.json` file to set the correct parameters for your inversion. If you don't know how, you can read the original article https://doi.org/10.48550/arXiv.2603.12081. 
 
 ### 3. Run the Main Computation
 The inversion routine now looks for `inputs/params.json` relative to your provided directory:
 ```bash
-julia --project=forceIBI -t <NUM_THREADS or auto> forceIBI/grinter_parallel.jl -d <YOUR_DIR>
+julia --project=direct-inversion -t <NUM_THREADS or auto> direct-inversion/grinter_parallel.jl -d <YOUR_DIR>
 ```
 
 ### 4. Analyze and Visualize Results
 To plot and analyze the results, run:
 ```bash
-python3 forceIBI/plot_results.py -d <YOUR_DIR>
+python3 direct-inversion/plot_results.py -d <YOUR_DIR>
 ```
 or 
 ```bash
-python3 forceIBI/convergence_plot.py -d <YOUR_DIR>
+python3 direct-inversion/convergence_plot.py -d <YOUR_DIR>
 ```
 
 The generated plots and data will be saved automatically in the `./outputs/` directory.
@@ -74,21 +71,20 @@ The generated plots and data will be saved automatically in the `./outputs/` dir
 
 ## 📁 Directory Architecture
 
-The pipeline is designed to be highly flexible. You can keep the repository codebase in one location and run the inversion on **any external working directory** on your machine using the `-d` (Python) or `--directory` (Julia) flags. 
+The pipeline is designed to be highly flexible. You can keep the repository codebase in one location and run the inversion on **any external working directory** on your machine using the `-d` or `--directory` flags. 
 
 ### 1. Source Code Repository
 This is the structure of the provided codebase:
 ```text
 project-root/
-├── src/                # Core scripts and modules
-│   ├── gr_borgis.jl         # Main function for Borgis Formula implementation
-│   ├── grinter_parallel.jl  # Main potential inversion loop
-│   ├── utils.jl             # Auxiliary functions for the inversion loop
-│   ├── ...                  # Additional Julia modules
-│   └── *.py                 # Python files for pre- and post-processing
-├── examples/*         # Example input files for testing and demonstration
+├── gr_borgis.jl         # Main function for Borgis Formula implementation
+├── grinter_parallel.jl  # Main potential inversion loop
+├── utils.jl             # Auxiliary functions for the inversion loop
+├── ...                  # Additional Julia modules
+├── *.py                 # Python files for pre- and post-processing
+├── examples/*           # Example input files for testing and demonstration
 │
-└── README.md                # This documentation
+└── README.md            # This documentation
 ```
 
 ### 2. User Working Directory (```YOUR_DIR```)
