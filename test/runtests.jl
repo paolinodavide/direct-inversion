@@ -11,40 +11,80 @@ const TEST_DIR = joinpath(@__DIR__, "test_env")
 const BASELINE_DIR = joinpath(@__DIR__, "baseline")
 
 function setup_test_environment()
-    Random.seed!(42)
     mkpath(TEST_DIR)
     mkpath(joinpath(TEST_DIR, "inputs"))
     mkpath(joinpath(TEST_DIR, "inputs", "configs"))
     
-    # 1. Generate 2 dummy configurations with 100 particles in 2D
+    # 1. Parse the first 2 snapshots from examples/lj_92_2.dat
+    examples_file = joinpath(@__DIR__, "..", "examples", "lj_92_2.dat")
+    if !isfile(examples_file)
+        error("examples/lj_92_2.dat not found!")
+    end
+    
     box_length = 30.0
-    N = 100
-    for file_num in [1, 2]
-        # Let's write them as ASCII .dat files, which grinter_parallel will convert to binary
-        filepath = joinpath(TEST_DIR, "inputs", "configs", "config_$(file_num).dat")
-        open(filepath, "w") do io
-            write(io, "# x \t y \t l_box = $(box_length)\n")
-            for _ in 1:N
-                # Generate random positions but keep them away from zero to avoid large forces
-                x = rand() * box_length
-                y = rand() * box_length
-                write(io, "$(x)\t$(y)\n")
+    num_snapshots_to_extract = 2
+    snapshots_extracted = 0
+    extracted_timesteps = String[]
+    
+    open(examples_file) do io
+        lines = readlines(io)
+        i = 1
+        while i <= length(lines)
+            if startswith(lines[i], "ITEM: TIMESTEP")
+                timestep = strip(lines[i+1])
+                push!(extracted_timesteps, timestep)
+                
+                # Find number of atoms
+                while !startswith(lines[i], "ITEM: NUMBER OF ATOMS")
+                    i += 1
+                end
+                N = parse(Int, lines[i+1])
+                
+                # Find atoms start
+                while !startswith(lines[i], "ITEM: ATOMS")
+                    i += 1
+                end
+                
+                # Write config file config_<timestep>.dat
+                filepath = joinpath(TEST_DIR, "inputs", "configs", "config_$(timestep).dat")
+                open(filepath, "w") do out_io
+                    write(out_io, "# x \t y \t l_box = $(box_length)\n")
+                    for _ in 1:N
+                        i += 1
+                        parts = split(strip(lines[i]))
+                        # xs and ys are at index 3 and 4 (scaled coordinates)
+                        x = parse(Float64, parts[3]) * box_length
+                        y = parse(Float64, parts[4]) * box_length
+                        write(out_io, "$(x)\t$(y)\n")
+                    end
+                end
+                
+                snapshots_extracted += 1
+                if snapshots_extracted >= num_snapshots_to_extract
+                    break
+                end
             end
+            i += 1
+        end
+    end
+    
+    if snapshots_extracted < num_snapshots_to_extract
+        error("Failed to extract $num_snapshots_to_extract snapshots from $examples_file")
+    end
+    
+    N_particles = 841
+
+    # 2. Generate ordered_wt.dat containing the extracted timesteps
+    open(joinpath(TEST_DIR, "inputs", "ordered_wt.dat"), "w") do io
+        write(io, "# wt ordered by min dist\n")
+        for ts in extracted_timesteps
+            write(io, "$(ts)\n")
         end
     end
 
-    # 2. Generate ordered_wt.dat
-    open(joinpath(TEST_DIR, "inputs", "ordered_wt.dat"), "w") do io
-        write(io, "# wt ordered by min dist\n")
-        write(io, "1\n")
-        write(io, "2\n")
-    end
-
     # 3. Generate a dummy target g(r) file
-    # We need r from 0.01 to 10.0 with step 0.01 (1000 bins)
     bin_width = 0.01
     r_values = collect(bin_width:bin_width:10.0)
-    # Let's make target g(r) a Lennard-Jones-like g(r) or just 1.0 everywhere with a core region of 0.0
     target_gr = [r < 0.8 ? 0.0 : 1.0 for r in r_values]
     
     open(joinpath(TEST_DIR, "inputs", "gr_weighted.dat"), "w") do io
@@ -54,8 +94,8 @@ function setup_test_environment()
 
     # 4. Generate params.json
     params = Dict(
-        "N_particles" => N,
-        "n_inversion_snapshots" => 2,
+        "N_particles" => N_particles,
+        "n_inversion_snapshots" => num_snapshots_to_extract,
         "L_box" => box_length,
         "dimensions" => 2,
         "bin_width" => bin_width,
