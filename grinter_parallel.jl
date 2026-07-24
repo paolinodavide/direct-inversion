@@ -68,6 +68,7 @@ function main()
     r_values, full_target_gr = data[:, 1], data[:, 2]
     binlow = findfirst(r -> r >= r_low, r_values)
     binhigh = findlast(r -> r <= r_high, r_values)
+    @assert r_values[2] - r_values[1] ≈ bin_width "Mismatch between provided bin_width and actual data spacing."
 
     # Then define r_range based on what you actually extracted
     r_range = r_values[binlow:binhigh]
