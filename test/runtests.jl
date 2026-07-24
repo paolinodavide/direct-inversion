@@ -11,6 +11,7 @@ const TEST_DIR = joinpath(@__DIR__, "test_env")
 const BASELINE_DIR = joinpath(@__DIR__, "baseline")
 
 function setup_test_environment()
+    rm(TEST_DIR, force=true, recursive=true)
     mkpath(TEST_DIR)
     mkpath(joinpath(TEST_DIR, "inputs"))
     mkpath(joinpath(TEST_DIR, "inputs", "configs"))
