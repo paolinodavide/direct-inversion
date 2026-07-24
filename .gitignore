@@ -20,3 +20,6 @@ make_config_iter.py
 # Local test directories
 test_run/
 test/test_env/
+
+# Julia project files
+Project.toml
