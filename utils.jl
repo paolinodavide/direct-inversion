@@ -54,7 +54,7 @@ function harmonic_potential(x::Float64, T::Float64)::Float64
     cutoff = 2.0 * x0
 
     if x < cutoff
-        return 0.5 * k * (x - x0)^2 / T
+        return 0.5 * k * (cutoff - x)^2 / T
     else
         return 0.0
     end
