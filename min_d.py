@@ -20,21 +20,23 @@ def find_config_files(directory='./configs/', pattern='*.dat'):
 @njit
 def minDistance_from_positions(positions, box_size, dim=2):
     N = len(positions)
-    dist_nd_sq = np.zeros(N * (N - 1) // 2)  # to match the result of pdist
-    idx = 0
+    # Initialize with infinity, keep track of the smallest square distance seen
+    min_dist_sq = np.inf
 
     for i in range(N - 1):
         for j in range(i + 1, N):
             dist_sq = 0.0
             for d in range(dim):
                 dist_1d = positions[i, d] - positions[j, d]
-                dist_1d -= box_size * np.round(dist_1d / box_size)  # Apply periodic boundary conditions
+                dist_1d -= box_size * np.round(dist_1d / box_size)  # Periodic boundary conditions
                 dist_sq += dist_1d ** 2
-            dist_nd_sq[idx] = dist_sq
-            idx += 1
 
-    dist_nd = np.sqrt(dist_nd_sq)
-    return np.min(dist_nd)
+            # If the calculated distance is smaller than our current minimum, update it
+            if dist_sq < min_dist_sq:
+                min_dist_sq = dist_sq
+
+    # Only take the square root of the absolute minimum distance at the very end
+    return np.sqrt(min_dist_sq)
 
 def minDistance_from_file(file_path, dim=2):
     box_size = np.loadtxt(file_path, comments=None, max_rows=1, usecols=-1)
@@ -66,10 +68,10 @@ def main():
 
     # Process in parallel with progress bar
     with Pool() as pool:
-        results = list(tqdm(pool.imap(minDistance_from_file, files), 
+        results = list(tqdm(pool.imap(minDistance_from_file, files),
                         total=len(files),
                         desc="Processing RDFs"))
-    
+
     # Extract file numbers and minimum distances
     file_numbers, min_distances = zip(*results)
 
@@ -109,16 +111,16 @@ def main():
     plt.savefig(output_path+"min_distances.pdf", dpi=300)
     plt.show()
 
-    
+
 
     sorted_file_numbers = [file_number for file_number, _ in sorted(results, key=lambda x: x[1])]
-    np.savetxt(inputs_path+"ordered_wt.dat", sorted_file_numbers, 
+    np.savetxt(inputs_path+"ordered_wt.dat", sorted_file_numbers,
            header='wt ordered by min dist', fmt='%d')
-    
+
     shuffled_file_numbers = np.random.permutation(sorted_file_numbers)
-    np.savetxt(inputs_path+"shuffled_wt.dat", shuffled_file_numbers, 
+    np.savetxt(inputs_path+"shuffled_wt.dat", shuffled_file_numbers,
            header='wt shuffled', fmt='%d')
-        
+
     return
 
 if __name__ == "__main__":
