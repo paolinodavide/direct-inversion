@@ -3,6 +3,7 @@ using JSON
 using DelimitedFiles
 using LinearAlgebra
 using StaticArrays
+using Random
 
 include(joinpath(@__DIR__, "..", "gr_borgis.jl"))
 
@@ -10,6 +11,7 @@ const TEST_DIR = joinpath(@__DIR__, "test_env")
 const BASELINE_DIR = joinpath(@__DIR__, "baseline")
 
 function setup_test_environment()
+    Random.seed!(42)
     mkpath(TEST_DIR)
     mkpath(joinpath(TEST_DIR, "inputs"))
     mkpath(joinpath(TEST_DIR, "inputs", "configs"))
@@ -272,7 +274,9 @@ function test_borgis_vs_histogram()
     # Already included at top of file
     
     borgis_contributions = zeros(Float64, num_bins)
-    compute_borgis_contributions!(borgis_contributions, positions, forces, box_length, 1.0/bin_width, num_bins)
+    max_dist = num_bins * bin_width
+    cell_list_borgis = build_cell_list(positions, box_length, max_dist)
+    compute_borgis_contributions!(borgis_contributions, positions, forces, cell_list_borgis, box_length, 1.0/bin_width, num_bins)
     integrate_borgis_contributions(borgis_contributions, Out())
     prefactor = compute_prefactor(N, box_length, dim)
     gr_borgis = 1.0 .- borgis_contributions ./ prefactor
