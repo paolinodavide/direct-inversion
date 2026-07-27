@@ -50,10 +50,16 @@ def main():
         required=True,
         help="The required home directory prefix where 'inputs' and 'outputs' will be created"
     )
+    parser.add_argument(
+        "--dr",
+        type=float,
+        default=0.002,
+        help="New bin width for output g(r) grid (default: 0.002)"
+    )
     args = parser.parse_args()
 
     rdf_path = os.path.join(args.directory, "outputs/rdfs/")
-    r, g_r, var_g = np.loadtxt(rdf_path+ 'g_r_h_avg.dat', unpack=True)
+    r, g_r, var_g = np.loadtxt(os.path.join(rdf_path, 'g_r_h_avg.dat'), unpack=True)
     plt.plot(r, g_r, 'o', label='Histo RDF', markersize=3)
 
     try:
@@ -72,21 +78,30 @@ def main():
         weights = get_weights(r, g_r)
 
     spline = make_smoothing_spline(r, g_r, weights)
-    g_smoothed = spline(r)
+
+    # 1. Obtain old dr
+    dr_old = r[1] - r[0]
+    # 2. Calculate old bin edges to evaluate min_r and max_r
+    min_r = r[0] - dr_old / 2.0
+    max_r = r[-1] + dr_old / 2.0
+    # 3. Produce new bin centers with new dr which become new radii
+    dr_new = args.dr
+    new_radii = np.arange(min_r + dr_new / 2.0, max_r, dr_new)
+
+    g_smoothed = spline(new_radii)
     if (g_min := np.min(g_smoothed)) < -1e-5:
         print(f"\nWarning: g_smoothed has a minimum value of {g_min}, below the threshold.")
 
-    radii = np.linspace(r[0], r[-1], 10_000)
-    plt.plot(radii, spline(radii), label='Weighted Spline')
+    plt.plot(new_radii, g_smoothed, label='Weighted Spline')
     plt.xlabel('r')
     plt.ylabel('g(r)')
     plt.legend()
-    plt.grid('--')
-    plt.savefig(rdf_path + '01_spline_gr.pdf', dpi=300)
+    plt.grid(True, linestyle='--')
+    plt.savefig(os.path.join(rdf_path, '01_spline_gr.pdf'), dpi=300)
     plt.show()
 
     output_file = os.path.join(args.directory, "inputs/gr_weighted.dat")
-    np.savetxt(output_file, np.column_stack((r, spline(r))), delimiter='\t', header="# r\tg(r)", comments='')
+    np.savetxt(output_file, np.column_stack((new_radii, g_smoothed)), delimiter='\t', header="# r\tg(r)", comments='')
     print(f"Weighted spline saved to {output_file}.")
 
 if __name__ == "__main__":

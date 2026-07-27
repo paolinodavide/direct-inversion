@@ -105,6 +105,7 @@ function setup_test_environment()
         "r_high" => 5.0,
         "x_min" => 0.8,
         "r_low" => 0.8,
+        "r_max" => 10.0,
         "target_gr_file" => "gr_weighted.dat",
         "target_precision" => 1e-15,
         "iteration_precision" => 1e-15,

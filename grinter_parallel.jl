@@ -35,10 +35,11 @@ function main()
     # Radial parameters
     r_low = params["r_low"]::Float64
     r_high = params["r_high"]::Float64
+    r_max = Float64(get(params, "r_max", get(params, "max_distance", 10.0)))
     bin_width = params["bin_width"]::Float64
     binlow = floor(Int, r_low / bin_width) + 1
     binhigh = floor(Int, r_high / bin_width) + 1
-    max_distance = min(L_box / 2.0, 10.0)
+    max_distance = min(L_box / 2.0, r_max)
     num_bins_gr = floor(Int, max_distance / bin_width)
 
     # File paths
