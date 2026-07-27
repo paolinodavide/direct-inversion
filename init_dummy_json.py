@@ -16,7 +16,7 @@ os.makedirs(os.path.join(args.directory, "inputs"), exist_ok=True)
 
 # Define the dummy parameters
 params = {
-    "N_particles": 842,
+    "N_particles": 1000,
     "n_inversion_snapshots": 500,
     "L_box": 30.0,
     "dimensions": 2,
@@ -26,17 +26,18 @@ params = {
     "r_high": 2.5,
     "x_min": 0.881,
     "r_low": 0.86,
+    "r_max": 10.0,
     "target_gr_file": "gr_weighted.dat",
     "target_precision": 1e-6,
     "iteration_precision": 1e-9,
     "output_file": "gr_final.dat",
     "max_iter": 500,
     "method_force_formula": "out",
-    "Temperature": 2.0,
+    "Temperature": 1.0,
     "init_pot_type": "mean_force",
     "target_pot_type": "lj_full",
-    "learning_rate": 0.2,
-    "core_strength": 14,
+    "learning_rate": 0.5,
+    "core_strength": 2,
     "shift_gr": True
 }
 

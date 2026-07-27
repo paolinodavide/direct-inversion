@@ -32,6 +32,123 @@ end
     return image, dot(image, image)
 end
 
+struct CellList{D}
+    n_cells_1d::Int
+    cell_width::Float64
+    cell_starts::Vector{Int}
+    particle_indices::Vector{Int}
+    cell_neighbors::Vector{Vector{Int}}
+end
+
+function get_forward_neighbor_offsets(D::Int)
+    offsets = SVector{D, Int}[]
+    if D == 2
+        for dx in -1:1
+            for dy in -1:1
+                if dx > 0 || (dx == 0 && dy > 0)
+                    push!(offsets, SVector(dx, dy))
+                end
+            end
+        end
+    elseif D == 3
+        for dx in -1:1
+            for dy in -1:1
+                for dz in -1:1
+                    if dx > 0 || (dx == 0 && dy > 0) || (dx == 0 && dy == 0 && dz > 0)
+                        push!(offsets, SVector(dx, dy, dz))
+                    end
+                end
+            end
+        end
+    end
+    return offsets
+end
+
+@inline function get_cell_index(coords::SVector{D, Int}, n_cells_1d::Int)::Int where D
+    cid = 1
+    mult = 1
+    for d in 1:D
+        # Wrap coordinates periodically
+        wrapped_c = mod(coords[d], n_cells_1d)
+        cid += wrapped_c * mult
+        mult *= n_cells_1d
+    end
+    return cid
+end
+
+function cell_index_to_coords(cid::Int, n_cells_1d::Int, D::Int)
+    coords = Vector{Int}(undef, D)
+    temp = cid - 1
+    for d in 1:D
+        coords[d] = temp % n_cells_1d
+        temp = div(temp, n_cells_1d)
+    end
+    return SVector{D, Int}(coords)
+end
+
+function compute_cell_neighbors(n_cells_1d::Int, D::Int)
+    total_cells = n_cells_1d^D
+    neighbor_offsets = get_forward_neighbor_offsets(D)
+    
+    cell_neighbors = [Int[] for _ in 1:total_cells]
+    
+    for cid in 1:total_cells
+        coords = cell_index_to_coords(cid, n_cells_1d, D)
+        
+        for offset in neighbor_offsets
+            neighbor_coords = coords + offset
+            neighbor_cid = get_cell_index(neighbor_coords, n_cells_1d)
+            push!(cell_neighbors[cid], neighbor_cid)
+        end
+    end
+    return cell_neighbors
+end
+
+function build_cell_list(positions::Vector{SVector{D, Float64}}, box_length::Float64, r_cut::Float64) where D
+    n_cells_1d = max(1, floor(Int, box_length / r_cut))
+    cell_width = box_length / n_cells_1d
+    total_cells = n_cells_1d^D
+    
+    cell_counts = zeros(Int, total_cells)
+    
+    for pos in positions
+        c_coords = map(x -> clamp(floor(Int, mod(x, box_length) / cell_width), 0, n_cells_1d - 1), pos)
+        cid = 1
+        mult = 1
+        for d in 1:D
+            cid += c_coords[d] * mult
+            mult *= n_cells_1d
+        end
+        cell_counts[cid] += 1
+    end
+    
+    cell_starts = ones(Int, total_cells + 1)
+    for cid in 1:total_cells
+        cell_starts[cid + 1] = cell_starts[cid] + cell_counts[cid]
+    end
+    
+    particle_indices = Vector{Int}(undef, length(positions))
+    current_offsets = copy(cell_starts)
+    
+    for (i, pos) in enumerate(positions)
+        c_coords = map(x -> clamp(floor(Int, mod(x, box_length) / cell_width), 0, n_cells_1d - 1), pos)
+        cid = 1
+        mult = 1
+        for d in 1:D
+            cid += c_coords[d] * mult
+            mult *= n_cells_1d
+        end
+        
+        offset = current_offsets[cid]
+        particle_indices[offset] = i
+        current_offsets[cid] += 1
+    end
+    
+    cell_neighbors = compute_cell_neighbors(n_cells_1d, D)
+    
+    return CellList{D}(n_cells_1d, cell_width, cell_starts, particle_indices, cell_neighbors)
+end
+
 
 """ 
 Compute g(r) using the Force prescription of Borgis et al.
@@ -40,7 +157,7 @@ Method specifyes the integration direction:
 - "out": integrate from infty inward
 - "both": return raw integrand
 """
-function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
+function grForce_notNorm_svectorized(particle_positions::Matrix{Float64},
     box_length::Float64,
     bin_width::Float64,
     num_bins_gr::Int,
@@ -48,19 +165,49 @@ function grForce_notNorm_svectorized(particle_positions::Array{Float64, D},
     r_min_interaction::Float64,
     r_cutoff_interaction::Float64,
     method::IntegrationMethod;
-    core_strength::Int=13) where D
+    core_strength::Int=13)
     
     num_particles, num_dimensions = size(particle_positions)
+    if num_dimensions == 2
+        return grForce_notNorm_svectorized_impl(Val(2), particle_positions, box_length, bin_width, num_bins_gr, force_over_r, r_min_interaction, r_cutoff_interaction, method; core_strength=core_strength)
+    elseif num_dimensions == 3
+        return grForce_notNorm_svectorized_impl(Val(3), particle_positions, box_length, bin_width, num_bins_gr, force_over_r, r_min_interaction, r_cutoff_interaction, method; core_strength=core_strength)
+    else
+        throw(ArgumentError("Unsupported physical dimension: $num_dimensions. Only 2D and 3D are supported."))
+    end
+end
+
+function grForce_notNorm_svectorized_impl(::Val{dim},
+    particle_positions::Matrix{Float64},
+    box_length::Float64,
+    bin_width::Float64,
+    num_bins_gr::Int,
+    force_over_r::Vector{Float64},
+    r_min_interaction::Float64,
+    r_cutoff_interaction::Float64,
+    method::IntegrationMethod;
+    core_strength::Int=13) where dim
+    
+    num_particles = size(particle_positions, 1)
     inv_bin_width = 1.0 / bin_width
 
-    positions = [SVector{D, Float64}(particle_positions'[:, i]) for i in 1:num_particles]
-    total_forces = zeros(SVector{D, Float64}, num_particles)
-    #println("Converted pos to SVectors")
+    # Convert positions to static vectors of correct physical dimension
+    positions = [SVector{dim, Float64}(particle_positions[i, :]) for i in 1:num_particles]
+    total_forces = zeros(SVector{dim, Float64}, num_particles)
 
-    evaluate_total_forces!(total_forces, positions, box_length, force_over_r, r_min_interaction, r_cutoff_interaction, bin_width; core_strength=core_strength)
+    # 1. Build cell list for force calculation (using r_cutoff_interaction as cutoff)
+    cell_list_force = build_cell_list(positions, box_length, r_cutoff_interaction)
 
+    # 2. Evaluate total forces using the cell list
+    evaluate_total_forces!(total_forces, positions, cell_list_force, box_length, force_over_r, r_min_interaction, r_cutoff_interaction, bin_width; core_strength=core_strength)
+
+    # 3. Build cell list for Borgis contributions (using max_distance as cutoff)
+    max_dist = num_bins_gr * bin_width
+    cell_list_borgis = build_cell_list(positions, box_length, max_dist)
+
+    # 4. Compute Borgis contributions using the cell list (truncated integration at max_distance)
     borgis_contributions = zeros(Float64, num_bins_gr)
-    compute_borgis_contributions!(borgis_contributions, positions, total_forces, box_length, inv_bin_width, num_bins_gr)
+    compute_borgis_contributions!(borgis_contributions, positions, total_forces, cell_list_borgis, box_length, inv_bin_width, num_bins_gr)
 
     return integrate_borgis_contributions(borgis_contributions, method)
 end
@@ -72,32 +219,81 @@ Compute contributions B_ij in the Borgis g(r) formula, which involves the relati
     borgis_contributions::Vector{Float64}, 
     positions::Vector{SVector{D, Float64}},     
     total_forces::Vector{SVector{D, Float64}},
+    cell_list::CellList{D},
     box_length::Float64, 
     inv_bin_width::Float64, 
     num_bins_gr::Int
     ) where D
     #fill!(borgis_contributions, 0.0)
-    num_particles = length(positions)
     box_sizes = fill(box_length, SVector{D, Float64})
+    total_cells = cell_list.n_cells_1d^D
+    max_dist2 = (num_bins_gr * (1.0 / inv_bin_width))^2
     
-    @inbounds for i in 1:num_particles-1
-        pos_i = positions[i]
-        force_i = total_forces[i]
+    @inbounds for cid in 1:total_cells
+        start_i = cell_list.cell_starts[cid]
+        end_i = cell_list.cell_starts[cid + 1] - 1
         
-        for j in i+1:num_particles
-            pos_j = positions[j]
-            force_j = total_forces[j]
-            # Calculate distance once
-            rVec_ij, r2_ij = pbc_distance(pos_i, pos_j, box_sizes)
+        # Pairs within the same cell
+        for idx_i in start_i:end_i
+            i = cell_list.particle_indices[idx_i]
+            pos_i = positions[i]
+            force_i = total_forces[i]
             
-            r_ij = sqrt(r2_ij)
-            radial_bin_index = floor(Int, r_ij * inv_bin_width)
-            target_bin = clamp(radial_bin_index + 1, 1, num_bins_gr)
-
-            force_diff = force_i - force_j
-            borgis_delta = borgis_delta_calculation(force_diff, rVec_ij, r2_ij, r_ij)
-
-            borgis_contributions[target_bin] += borgis_delta
+            for idx_j in (idx_i + 1):end_i
+                j = cell_list.particle_indices[idx_j]
+                pos_j = positions[j]
+                force_j = total_forces[j]
+                
+                rVec_ij, r2_ij = pbc_distance(pos_i, pos_j, box_sizes)
+                if max_dist2 < r2_ij
+                    continue
+                end
+                
+                r_ij = sqrt(r2_ij)
+                radial_bin_index = floor(Int, r_ij * inv_bin_width)
+                target_bin = radial_bin_index + 1
+                if target_bin > num_bins_gr
+                    continue # Discard pairs beyond max_distance
+                end
+                
+                force_diff = force_i - force_j
+                borgis_delta = borgis_delta_calculation(force_diff, rVec_ij, r2_ij, r_ij)
+                borgis_contributions[target_bin] += borgis_delta
+            end
+        end
+        
+        # Pairs between cell cid and neighboring cells
+        for neighbor_cid in cell_list.cell_neighbors[cid]
+            start_j = cell_list.cell_starts[neighbor_cid]
+            end_j = cell_list.cell_starts[neighbor_cid + 1] - 1
+            
+            for idx_i in start_i:end_i
+                i = cell_list.particle_indices[idx_i]
+                pos_i = positions[i]
+                force_i = total_forces[i]
+                
+                for idx_j in start_j:end_j
+                    j = cell_list.particle_indices[idx_j]
+                    pos_j = positions[j]
+                    force_j = total_forces[j]
+                    
+                    rVec_ij, r2_ij = pbc_distance(pos_i, pos_j, box_sizes)
+                    if max_dist2 < r2_ij
+                        continue
+                    end
+                    
+                    r_ij = sqrt(r2_ij)
+                    radial_bin_index = floor(Int, r_ij * inv_bin_width)
+                    target_bin = radial_bin_index + 1
+                    if target_bin > num_bins_gr
+                        continue # Discard pairs beyond max_distance
+                    end
+                    
+                    force_diff = force_i - force_j
+                    borgis_delta = borgis_delta_calculation(force_diff, rVec_ij, r2_ij, r_ij)
+                    borgis_contributions[target_bin] += borgis_delta
+                end
+            end
         end
     end
     return nothing
@@ -131,6 +327,7 @@ Compute total force acting on each particle.
 """
 @inline function evaluate_total_forces!(total_forces::Vector{SVector{D, Float64}},
     positions::Vector{SVector{D, Float64}},
+    cell_list::CellList{D},
     box_length::Float64, force_over_r::Vector{Float64},
     r_min_interaction::Float64, 
     r_cutoff_interaction::Float64, 
@@ -141,30 +338,69 @@ Compute total force acting on each particle.
     box_sizes = fill(box_length, SVector{D, Float64})
     inv_bin_width = 1.0 / bin_width
     r_cut2 = r_cutoff_interaction^2
+    total_cells = cell_list.n_cells_1d^D
 
-    @inbounds for i in 1:num_particles-1
-        pos_i = positions[i]
+    fill!(total_forces, zero(SVector{D, Float64}))
 
-        for j in i+1:num_particles
-            pos_j = positions[j]
-
-            rVec_ij, r2_ij= pbc_distance(pos_i, pos_j, box_sizes)
-            if r_cut2 < r2_ij
-                continue
+    @inbounds for cid in 1:total_cells
+        start_i = cell_list.cell_starts[cid]
+        end_i = cell_list.cell_starts[cid + 1] - 1
+        
+        # Pairs within the same cell
+        for idx_i in start_i:end_i
+            i = cell_list.particle_indices[idx_i]
+            pos_i = positions[i]
+            
+            for idx_j in (idx_i + 1):end_i
+                j = cell_list.particle_indices[idx_j]
+                pos_j = positions[j]
+                
+                rVec_ij, r2_ij = pbc_distance(pos_i, pos_j, box_sizes)
+                if r_cut2 < r2_ij
+                    continue
+                end
+                
+                r_ij = sqrt(r2_ij)
+                f_magnitude = if r_ij < r_min_interaction
+                    force_magnitude_below_rmin(r_ij, r_min_interaction, force_over_r, inv_bin_width; core_strength=core_strength)
+                else
+                    force_magnitude_between_bins(r_ij, r_min_interaction, r_cutoff_interaction, force_over_r, inv_bin_width)
+                end
+                
+                total_forces[i] += f_magnitude * rVec_ij
+                total_forces[j] -= f_magnitude * rVec_ij
             end
-
-            r_ij = sqrt(r2_ij)
-
-
-            #f_magnitude::Float64 = 0.0
-            f_magnitude = if r_ij < r_min_interaction
-                force_magnitude_below_rmin(r_ij, r_min_interaction, force_over_r, inv_bin_width; core_strength=core_strength)
-            else
-                force_magnitude_between_bins(r_ij, r_min_interaction, r_cutoff_interaction, force_over_r, inv_bin_width)
+        end
+        
+        # Pairs between cell cid and its neighboring cells
+        for neighbor_cid in cell_list.cell_neighbors[cid]
+            start_j = cell_list.cell_starts[neighbor_cid]
+            end_j = cell_list.cell_starts[neighbor_cid + 1] - 1
+            
+            for idx_i in start_i:end_i
+                i = cell_list.particle_indices[idx_i]
+                pos_i = positions[i]
+                
+                for idx_j in start_j:end_j
+                    j = cell_list.particle_indices[idx_j]
+                    pos_j = positions[j]
+                    
+                    rVec_ij, r2_ij = pbc_distance(pos_i, pos_j, box_sizes)
+                    if r_cut2 < r2_ij
+                        continue
+                    end
+                    
+                    r_ij = sqrt(r2_ij)
+                    f_magnitude = if r_ij < r_min_interaction
+                        force_magnitude_below_rmin(r_ij, r_min_interaction, force_over_r, inv_bin_width; core_strength=core_strength)
+                    else
+                        force_magnitude_between_bins(r_ij, r_min_interaction, r_cutoff_interaction, force_over_r, inv_bin_width)
+                    end
+                    
+                    total_forces[i] += f_magnitude * rVec_ij
+                    total_forces[j] -= f_magnitude * rVec_ij
+                end
             end
-
-            total_forces[i] += f_magnitude * rVec_ij
-            total_forces[j] -= f_magnitude * rVec_ij
         end
     end
 end
