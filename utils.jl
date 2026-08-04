@@ -47,6 +47,19 @@ function wca_potential(x::Float64, T::Float64)::Float64
     end
 end
 
+function harmonic_potential(x::Float64, T::Float64)::Float64
+    """Harmonic potential."""
+    k = 10.0
+    x0 = 1.0
+    cutoff = 2.0 * x0
+
+    if x < cutoff
+        return 0.5 * k * (cutoff - x)^2 / T
+    else
+        return 0.0
+    end
+end
+
 function get_potential_from_name(name::String, T::Float64, radii::Vector{Float64})::Vector{Float64}
     """Choose the potential to initiate the iteration loop. Returns the potential as an array."""
     pot_list = zeros(Float64, length(radii))
@@ -58,7 +71,8 @@ function get_potential_from_name(name::String, T::Float64, radii::Vector{Float64
         "lj_test" => lj_test,
         "wca" => wca_potential,
         "r3" => (x, T) -> 1.0 / T * x^(-3), 
-        "sh" => shoulder_potential
+        "sh" => shoulder_potential,
+        "harmonic" => harmonic_potential
     )
 
     if name == "zero"
