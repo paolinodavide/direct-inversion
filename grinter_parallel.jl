@@ -34,7 +34,7 @@ function main()
 
     # Radial parameters
     r_low = params["r_low"]::Float64
-    r_high = params["r_high"]::Float64
+    r_high = Float64(params["r_high"])
     r_max = Float64(get(params, "r_max", get(params, "max_distance", 10.0)))
     bin_width = params["bin_width"]::Float64
     binlow = floor(Int, r_low / bin_width) + 1
@@ -148,11 +148,11 @@ function main()
         
         if error < target_tol || iteration_diff < iteration_tol || iteration == max_iter
             @info "Convergence achieved" iteration=iteration
-            save_gr_data(r_values, gr_normalized, joinpath(HomeDir, "outputs/gr_final.dat"))
+            save_gr_data(r_values, gr_normalized[1:length(r_values)], joinpath(HomeDir, "outputs/gr_final.dat"))
             
             break
         end
-        save_gr_data(r_values, gr_normalized, joinpath(HomeDir, "outputs/gr_$(iteration).dat"))
+        save_gr_data(r_values, gr_normalized[1:length(r_values)], joinpath(HomeDir, "outputs/gr_$(iteration).dat"))
 
         # u_t → u_t+1
         update_potential!(βu_current, gr_current, gr_target, learning_rate, shift_gr)

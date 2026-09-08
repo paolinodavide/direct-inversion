@@ -20,12 +20,12 @@ def get_weights(r, gr):
             filtered_crossings.append(crossings[i])
     crossings = np.array(filtered_crossings)
 
-    if len(crossings) > 1:
+    if len(crossings) >= 1:
         print(f"First crossing with gMax/2 = {max_g / 2:.2f} at r = {r_masked[crossings[0]]}")
     else:
-        print(f"No second crossing of g_masked with {max_g / 2:.2f}.")
+        print(f"No crossing of g_masked with {max_g / 2:.2f}.")
 
-    threshold = 0.3#max_g / 10
+    threshold = 0.25 #max_g / 10
     oscillation_start_index = next(
         (i for i in range(len(g_masked)) if np.all(np.abs(g_masked[i:] - 1) <= threshold)), None
     )
@@ -35,10 +35,10 @@ def get_weights(r, gr):
         print("g_masked does not oscillate around 1 within the given range.")
 
     weights = np.ones_like(r)
-    if len(crossings) > 1:
-        weights[r < r_masked[crossings[0]]] *= 10**3
+    if len(crossings) >= 1:
+        weights[r < r_masked[crossings[0]]] *= 5*10**1
     if oscillation_start_index is not None:
-        weights[r > r_masked[oscillation_start_index]] *= 10**-3
+        weights[r > r_masked[oscillation_start_index]] *= 10**-2
 
     return weights
 
