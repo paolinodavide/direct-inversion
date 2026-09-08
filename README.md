@@ -6,6 +6,7 @@ This projects builds a tool to reconstruct the interaction between particles sta
  
 ---
 ---
+
 # ⚙️ Usage Guide
 ## Quick Start for Main Inversion
 If your target directory is already fully prepared with configurations and a `params.json` file at `<YOUR_DIR>/inputs/params.json`, you can launch the inversion directly from the project root:
