@@ -34,9 +34,9 @@ colors = cm.coolwarm(np.linspace(0, 1, num_files))
 
 # 2. Setup Figure with custom width ratios
 # Ratio explanation: [Panel A, Panel B, Colorbar Slot, Panel C]
-# Setting the 3rd element to 0.05 keeps B and C apart for the bar, 
+# Setting the 3rd element to 0.05 keeps B and C apart for the bar,
 # while a and b stay closer because there is no slot between them.
-fig, axs_all = plt.subplots(1, 4, figsize=(8, 8/3), 
+fig, axs_all = plt.subplots(1, 4, figsize=(8, 8/3),
                             gridspec_kw={'width_ratios': [1, 1, 0.05,  1]},
                             constrained_layout=True)
 
@@ -48,18 +48,18 @@ axs = [ax_a, ax_b, ax_c] # List for easy looping
 for i, file in enumerate(files):
     try:
         radii, gr, pot, _ = np.loadtxt(os.path.join(Path, file), unpack=True)
-        
-        if i in [1, num_files - 1]: 
+
+        if i in [1, num_files - 1]:
             alpha_val, lw, z, label_val = 1.0, 1.4, 10, None
         elif file == 'iteration_-1.dat':
-            colors[i] = cm.seismic(0)  
+            colors[i] = cm.seismic(0)
             alpha_val, lw, z, label_val = 1.0, 1.4, 11, r'True Potential'
         else:
             alpha_val, lw, z, label_val = 0.6, 0.7, 1, None
 
         if file != 'iteration_-1.dat':
             ax_a.plot(radii, gr, color=colors[i], alpha=alpha_val, linewidth=1.4, zorder=z)
-        
+
         ax_b.plot(radii, pot, color=colors[i], alpha=alpha_val, linewidth=lw, zorder=z, label=label_val, linestyle='-' if file != 'iteration_-1.dat' else '--')
     except Exception as e:
         print(f"Skipping {file}: {e}")
@@ -70,7 +70,7 @@ sm = plt.cm.ScalarMappable(cmap=cm.coolwarm, norm=plt.Normalize(vmin=0, vmax=num
 cbar = fig.colorbar(sm, cax=ax_cbar, orientation='vertical')
 
 # Remove the previous side-label
-cbar.set_label('') 
+cbar.set_label('')
 
 #ctick on the left
 ax_cbar.set_xlabel(r'$t$', labelpad=4, ha='left')
@@ -93,11 +93,11 @@ for i, ax in enumerate(axs):
     ax.tick_params(direction='in', which='both', top=True, right=True)
     for spine in ax.spines.values():
         spine.set_linewidth(1.2)
-    
-    
-    ax.text(separations[i], 1.0, labels[i], transform=ax.transAxes, 
+
+
+    ax.text(separations[i], 1.0, labels[i], transform=ax.transAxes,
             fontsize=11, fontweight='bold', va='top', ha='right')
-    
+
 
 # Panel A Limits/Labels
 ax_a.set_xlabel(r'$r\, /\, \sigma$')
@@ -122,4 +122,5 @@ ax_c.set_ylabel('Convergence Metrics', size='large')
 
 # Save and Show
 plt.savefig(os.path.join(Path, '00Convergence_Highlight.pdf'), dpi=300)
+plt.savefig(os.path.join(Path, '00Convergence_Highlight.png'), dpi=300)
 plt.show()

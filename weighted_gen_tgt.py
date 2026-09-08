@@ -36,9 +36,9 @@ def get_weights(r, gr):
 
     weights = np.ones_like(r)
     if len(crossings) >= 1:
-        weights[r < r_masked[crossings[0]]] *= 5*10**1
+        weights[r < r_masked[crossings[0]]] *= 10**2
     if oscillation_start_index is not None:
-        weights[r > r_masked[oscillation_start_index]] *= 10**-2
+        weights[r > r_masked[oscillation_start_index]] *= 10**-1
 
     return weights
 
@@ -98,6 +98,7 @@ def main():
     plt.legend()
     plt.grid(True, linestyle='--')
     plt.savefig(os.path.join(rdf_path, '01_spline_gr.pdf'), dpi=300)
+    plt.savefig(os.path.join(rdf_path, '01_spline_gr.png'))
     plt.show()
 
     output_file = os.path.join(args.directory, "inputs/gr_weighted.dat")
