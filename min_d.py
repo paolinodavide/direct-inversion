@@ -109,6 +109,7 @@ def main():
     # Save and show
     plt.tight_layout()
     plt.savefig(output_path+"min_distances.pdf", dpi=300)
+    plt.savefig(output_path+"min_distances.png")
     plt.show()
 
 
