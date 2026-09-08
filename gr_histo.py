@@ -40,7 +40,7 @@ def rdf_from_file(filename, dr, r_max=10, output_folder='outputs/rdfs/'):
 
         os.makedirs(output_folder, exist_ok=True)
 
-        output_filename = f'{output_folder}/g_r_lj_{file_num}.dat'
+        output_filename = f'{output_folder}/g_r_{file_num}.dat'
         np.savetxt(output_filename, np.column_stack((r, g_r)),
                   header='# r g(r)')
 
@@ -127,8 +127,8 @@ def calculate_rdf_numba(positions, box_size, dr=0.02, r_max=10.0):
     return r, g_r
 
 def process_file(args):
-    file, dr, folder = args
-    return rdf_from_file(file, dr, r_max=10, output_folder=folder)
+    file, dr, r_max, folder = args
+    return rdf_from_file(file, dr, r_max=r_max, output_folder=folder)
 
 def main():
     parser = argparse.ArgumentParser(description="Calculate RDFs from configuration files")
@@ -144,6 +144,13 @@ def main():
         default=0.002,
         help="Bin width for RDF calculation (default: 0.002)"
     )
+    parser.add_argument(
+        "--r_max", "-m",
+        type=float,
+        default=10.0,
+        help="Maximum radius for RDF calculation (default: 10.0)"
+    )
+
     args = parser.parse_args()
 
     # Find all files to process
@@ -160,7 +167,7 @@ def main():
 
     # Process in parallel with progress bar
     with Pool() as pool:
-        results = list(tqdm(pool.imap(process_file, [(file, args.dr, output_path+'/rdfs/') for file in files]),
+        results = list(tqdm(pool.imap(process_file, [(file, args.dr, args.r_max, output_path+'/rdfs/') for file in files]),
                                   total=len(files),
                                   desc="Processing RDFs"))
 
@@ -190,6 +197,7 @@ def main():
     plt.title('Radial Distribution Function', fontsize=16)
     plt.tight_layout()
     plt.savefig(output_path + '/rdfs/00gr_histo.pdf', dpi=300)
+    plt.savefig(output_path + '/rdfs/00gr_histo.png')
     plt.show()
 
 if __name__ == '__main__':
