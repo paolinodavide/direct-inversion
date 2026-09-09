@@ -22,10 +22,10 @@ function main()
     end
     parsed_args = parse_args(s)
     HomeDir = parsed_args["directory"]
-    
+
     # Load parameters
     params = JSON.parsefile(joinpath(HomeDir, "inputs/params.json"))
-    
+
     # Extract parameters with clear grouping
     N_particles = params["N_particles"]::Int
     L_box = Float64(params["L_box"])
@@ -36,6 +36,8 @@ function main()
     r_low = params["r_low"]::Float64
     r_high = Float64(params["r_high"])
     r_max = Float64(get(params, "r_max", get(params, "max_distance", 10.0)))
+    r_max < r_high && throw(ArgumentError("r_max ($r_max) must be greater than the potential cutoff r_high ($r_high)."))
+
     bin_width = params["bin_width"]::Float64
     binlow = floor(Int, r_low / bin_width) + 1
     binhigh = floor(Int, r_high / bin_width) + 1
@@ -50,7 +52,7 @@ function main()
     target_pot = params["target_pot_type"]::String
     number_config = params["n_inversion_snapshots"]::Int
     wt_file_path = joinpath(path_target, params["wt_file"]::String)
-    
+
     # Optimization parameters
     max_iter = params["max_iter"]::Int
     learning_rate = Float64(params["learning_rate"])
@@ -84,11 +86,11 @@ function main()
 
     gr_target = @view full_target_gr[binlow:binhigh]
     gr_current = copy(gr_target)
-    
+
     # Initialize potentials
     βu_target = get_potential_from_name(target_pot, T, r_range)
     f_target = f_over_r_from_potential(βu_target, r_low, bin_width)
-    
+
     βu_current = if initial_pot == "mean_force"
         - log.(abs.(gr_target))
     else
@@ -100,23 +102,23 @@ function main()
     # Handle binary configuration files
     config_dir = ensure_binary_configs(config_dir, wt_file_path, number_config)
 
-    
+
     # Precompute constants
     prefactor = compute_prefactor(N_particles, L_box, dimensions)
     delta_target = gr_target[1]
-    
+
     # Initialize tracking
     start_time = time()
     convergence_file = joinpath(HomeDir, "outputs/convergence_data.dat")
     initialize_convergence_file(convergence_file)
-    
+
     # Main optimization loop
     for iteration in 0:max_iter
         gr_old = copy(gr_current)
-        
+
         # βu_t → gr_t
         gr_notNorm, _ = gr_force_from_dir_parallel_binary(
-            config_dir, L_box, bin_width, num_bins_gr, 
+            config_dir, L_box, bin_width, num_bins_gr,
             f_current, r_low, r_high, method_type;
             core_strength=core_strength
         )
@@ -140,16 +142,16 @@ function main()
 
         # Check convergence
         error, iteration_diff, potential_increase = compute_convergence_metrics(gr_current, gr_target, gr_old)
-        
+
         @info "Iteration $iteration" error=error iteration_diff=iteration_diff potential_increase=potential_increase g_min=g_min delta=(gr_current[1] - delta_target)
-        
-        # Save iteration data      
+
+        # Save iteration data
         append_convergence_data(convergence_file, iteration, time() - start_time, error, iteration_diff, potential_increase, g_end, g_min)
-        
+
         if error < target_tol || iteration_diff < iteration_tol || iteration == max_iter
             @info "Convergence achieved" iteration=iteration
             save_gr_data(r_values, gr_normalized[1:length(r_values)], joinpath(HomeDir, "outputs/gr_final.dat"))
-            
+
             break
         end
         save_gr_data(r_values, gr_normalized[1:length(r_values)], joinpath(HomeDir, "outputs/gr_$(iteration).dat"))
@@ -158,7 +160,7 @@ function main()
         update_potential!(βu_current, gr_current, gr_target, learning_rate, shift_gr)
         f_current = f_over_r_from_potential(βu_current, r_low, bin_width)
     end
-    
+
     # Save final target data
     save_target_data(r_range, gr_target, βu_target, f_target, joinpath(HomeDir, "outputs/iteration_-1.dat"))
     cp(joinpath(HomeDir, "inputs/params.json"), joinpath(HomeDir, "outputs/00params.json"), force=true)
@@ -169,11 +171,11 @@ end
 Updates the potential based on the current and target g(r) values using the Schommer update rule.
 """
 function update_potential!(
-    βu_t::AbstractVector{Float64}, 
-    gr_t::AbstractVector{Float64}, 
-    gr_tgt::AbstractVector{Float64}, 
-    learning_rate::Float64, 
-    correct_offset::Bool=false; 
+    βu_t::AbstractVector{Float64},
+    gr_t::AbstractVector{Float64},
+    gr_tgt::AbstractVector{Float64},
+    learning_rate::Float64,
+    correct_offset::Bool=false;
     small_number::Float64=1e-10)
     # Ensure all vectors have the same dimensions
     if !(length(βu_t) == length(gr_t) == length(gr_tgt))
@@ -184,17 +186,17 @@ function update_potential!(
     g_min = gr_t[min_index]
     Delta = 0.0
     if correct_offset
-        Delta = g_min - gr_tgt[min_index] 
+        Delta = g_min - gr_tgt[min_index]
     end
 
-    @. gr_t = gr_t - Delta 
+    @. gr_t = gr_t - Delta
     if minimum(gr_t) < 0 || any(isnan.(gr_t))
         @error "Negative g(r) or NaN detected. Retry with higher r_low"
         exit(1)
     end
 
     @. βu_t = βu_t + learning_rate * log(gr_t / gr_tgt + small_number)
-    βu_t .-= βu_t[end]  
+    βu_t .-= βu_t[end]
 end
 
 """
