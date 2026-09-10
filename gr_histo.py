@@ -194,7 +194,15 @@ def main():
     plt.scatter(r, g_total, s=10, label='g(r)')
     plt.xlabel(r'$r/\sigma$', fontsize=14)
     plt.ylabel('g(r)', fontsize=14)
-    plt.title('Radial Distribution Function', fontsize=16)
+    plt.xlim(0, args.r_max)
+    plt.tick_params(
+        direction="in",  # Inward-pointing ticks
+        which="both",  # Apply to both major and minor ticks
+        top=True,  # Show ticks on the top spine
+        bottom=True,  # Show ticks on the bottom spine
+        left=True,  # Show ticks on the left spine
+        right=True,  # Show ticks on the right spine
+    )
     plt.tight_layout()
     plt.savefig(output_path + '/rdfs/00gr_histo.pdf', dpi=300)
     plt.savefig(output_path + '/rdfs/00gr_histo.png')

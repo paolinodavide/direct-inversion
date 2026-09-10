@@ -11,7 +11,7 @@ def get_weights(r, gr):
     g_masked, r_masked = gr[mask], r[mask]
 
     max_g = np.max(g_masked)
-    crossings = np.where(np.diff(np.sign(g_masked - max_g / 2)))[0]
+    crossings = np.where(np.diff(np.sign(g_masked - 1)))[0]
 
     # Filter crossings to ensure at least 0.1 distance between them
     filtered_crossings = [crossings[0]] if len(crossings) > 0 else []
@@ -25,20 +25,23 @@ def get_weights(r, gr):
     else:
         print(f"No crossing of g_masked with {max_g / 2:.2f}.")
 
-    threshold = 0.25 #max_g / 10
+    threshold = max_g / 10
     oscillation_start_index = next(
         (i for i in range(len(g_masked)) if np.all(np.abs(g_masked[i:] - 1) <= threshold)), None
     )
+    oscillation_start_index = round(len(g_masked) * 0.75)
     if oscillation_start_index is not None:
         print(f"g(r) starts oscillating with amplitude = {threshold:.2f} at r = {r_masked[oscillation_start_index]}")
     else:
         print("g_masked does not oscillate around 1 within the given range.")
 
+
     weights = np.ones_like(r)
     if len(crossings) >= 1:
         weights[r < r_masked[crossings[0]]] *= 10**2
     if oscillation_start_index is not None:
-        weights[r > r_masked[oscillation_start_index]] *= 10**-1
+        weights[r > r_masked[oscillation_start_index]] *= 10**1
+        weights[ (r_masked[crossings[0]] < r) & (r < r_masked[oscillation_start_index]) ] *= 10**0
 
     return weights
 
@@ -92,11 +95,13 @@ def main():
     if (g_min := np.min(g_smoothed)) < -1e-5:
         print(f"\nWarning: g_smoothed has a minimum value of {g_min}, below the threshold.")
 
-    plt.plot(new_radii, g_smoothed, label='Weighted Spline')
-    plt.xlabel('r')
+    plt.plot(new_radii, g_smoothed, label=f'Spline g({new_radii[-1]:.1f}) = {g_smoothed[-1]:.3f}')
+    plt.xlabel(r'$r/\sigma$')
     plt.ylabel('g(r)')
-    plt.legend()
-    plt.grid(True, linestyle='--')
+    plt.legend(loc='lower right', frameon=False)
+    plt.tick_params(direction="in", top=True, right=True)
+    plt.xlim(0, max_r)
+    plt.tight_layout()
     plt.savefig(os.path.join(rdf_path, '01_spline_gr.pdf'), dpi=300)
     plt.savefig(os.path.join(rdf_path, '01_spline_gr.png'))
     plt.show()
