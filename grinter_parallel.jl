@@ -102,6 +102,12 @@ function main()
     # Handle binary configuration files
     config_dir = ensure_binary_configs(config_dir, wt_file_path, number_config)
 
+    # Precompute pair geometry (once — positions are static across iterations)
+    @info "Precomputing pair geometry for all snapshots..."
+    precomp_time = @elapsed snapshot_caches = precompute_all_snapshots(
+        config_dir, L_box, bin_width, num_bins_gr, r_high
+    )
+    @info "Precomputation done" time=precomp_time n_snapshots=length(snapshot_caches)
 
     # Precompute constants
     prefactor = compute_prefactor(N_particles, L_box, dimensions)
@@ -116,10 +122,10 @@ function main()
     for iteration in 0:max_iter
         gr_old = copy(gr_current)
 
-        # βu_t → gr_t
-        gr_notNorm, _ = gr_force_from_dir_parallel_binary(
-            config_dir, L_box, bin_width, num_bins_gr,
-            f_current, r_low, r_high, method_type;
+        # βu_t → gr_t (using precomputed pair geometry)
+        gr_notNorm, _ = evaluate_gr_from_caches(
+            snapshot_caches, f_current, num_bins_gr,
+            r_low, r_high, bin_width, L_box, method_type;
             core_strength=core_strength
         )
         if any(isnan.(gr_notNorm))

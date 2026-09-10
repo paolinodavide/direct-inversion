@@ -13,6 +13,28 @@ struct Out <: IntegrationMethod end
 struct Both <: IntegrationMethod end
 
 """
+Precomputed pair data for a single particle pair.
+Stores the minimum geometric information needed for both force and Borgis evaluation.
+"""
+struct PairData{D}
+    i::Int32
+    j::Int32
+    rVec::SVector{D, Float64}
+    r::Float64              # = sqrt(dot(rVec, rVec))
+end
+
+"""
+Cached pair data for one configuration snapshot.
+The pairs vector is partitioned: pairs[1:n_force_pairs] have r ≤ r_cut,
+pairs[n_force_pairs+1:end] have r_cut < r ≤ max_dist.
+"""
+struct SnapshotCache{D}
+    n_particles::Int
+    pairs::Vector{PairData{D}}
+    n_force_pairs::Int
+end
+
+"""
 Apply minum image convention to a separation vector given the box length and its inverse.
 """
 @inline function wrap_pbc_distances(separation::Float64, box_length::Float64, inv_box_length::Float64)::Float64
@@ -320,6 +342,223 @@ end
 end
 @inline function borgis_delta_calculation(force_diff::SVector{D, Float64}, rVec_ij::SVector{D, Float64}, r2_ij::Float64, r_ij::Float64)::Float64 where D
     return dot(force_diff, rVec_ij) / (r_ij^D)
+end
+
+# ══════════════════════════════════════════════════════════════════════════════
+# In-memory pair caching: precompute geometry once, evaluate per iteration
+# ══════════════════════════════════════════════════════════════════════════════
+
+"""
+    precompute_snapshot_pairs(Val(D), positions_matrix, box_length, bin_width, num_bins_gr, r_cut)
+
+Build a partitioned pair list for one snapshot. Uses a single cell list at 
+max_dist = num_bins_gr * bin_width (the larger cutoff). Pairs with r ≤ r_cut 
+are stored first, followed by pairs with r_cut < r ≤ max_dist.
+"""
+function precompute_snapshot_pairs(::Val{D},
+        positions_matrix::Matrix{Float64},
+        box_length::Float64, bin_width::Float64,
+        num_bins_gr::Int, r_cut::Float64) where D
+
+    N = size(positions_matrix, 1)
+    positions = [SVector{D,Float64}(positions_matrix[i,:]) for i in 1:N]
+    max_dist = num_bins_gr * bin_width
+
+    # One cell list at the larger cutoff
+    cell_list = build_cell_list(positions, box_length, max_dist)
+    box_sizes = fill(box_length, SVector{D, Float64})
+    max_dist2 = max_dist^2
+    r_cut2 = r_cut^2
+    total_cells = cell_list.n_cells_1d^D
+
+    force_pairs = PairData{D}[]
+    far_pairs   = PairData{D}[]
+
+    @inbounds for cid in 1:total_cells
+        start_i = cell_list.cell_starts[cid]
+        end_i   = cell_list.cell_starts[cid + 1] - 1
+
+        # Same-cell pairs
+        for idx_i in start_i:end_i
+            i = cell_list.particle_indices[idx_i]
+            for idx_j in (idx_i + 1):end_i
+                j = cell_list.particle_indices[idx_j]
+                rVec, r2 = pbc_distance(positions[i], positions[j], box_sizes)
+                r2 > max_dist2 && continue
+                r = sqrt(r2)
+                p = PairData{D}(Int32(i), Int32(j), rVec, r)
+                if r2 <= r_cut2
+                    push!(force_pairs, p)
+                else
+                    push!(far_pairs, p)
+                end
+            end
+        end
+
+        # Neighbor-cell pairs
+        for neighbor_cid in cell_list.cell_neighbors[cid]
+            start_j = cell_list.cell_starts[neighbor_cid]
+            end_j   = cell_list.cell_starts[neighbor_cid + 1] - 1
+            for idx_i in start_i:end_i
+                i = cell_list.particle_indices[idx_i]
+                for idx_j in start_j:end_j
+                    j = cell_list.particle_indices[idx_j]
+                    rVec, r2 = pbc_distance(positions[i], positions[j], box_sizes)
+                    r2 > max_dist2 && continue
+                    r = sqrt(r2)
+                    p = PairData{D}(Int32(i), Int32(j), rVec, r)
+                    if r2 <= r_cut2
+                        push!(force_pairs, p)
+                    else
+                        push!(far_pairs, p)
+                    end
+                end
+            end
+        end
+    end
+
+    n_force = length(force_pairs)
+    pairs = vcat(force_pairs, far_pairs)
+
+    return SnapshotCache{D}(N, pairs, n_force)
+end
+
+"""
+    precompute_all_snapshots(directory, box_length, bin_width, num_bins_gr, r_cut)
+
+Parallel precomputation of pair lists for all binary config files in a directory.
+"""
+function precompute_all_snapshots(
+        directory::String, box_length::Float64, bin_width::Float64,
+        num_bins_gr::Int, r_cut::Float64)
+
+    file_paths = String[]
+    for (root, _, files) in walkdir(directory)
+        for file in files
+            endswith(file, ".bin") && push!(file_paths, joinpath(root, file))
+        end
+    end
+    isempty(file_paths) && throw(ArgumentError("No binary files found in directory: $directory"))
+
+    # Infer dimension from first file
+    sample = read_particle_positions_binary(file_paths[1])
+    dim = size(sample, 2)
+
+    caches = ThreadsX.map(file_paths) do fp
+        pos = read_particle_positions_binary(fp)
+        precompute_snapshot_pairs(Val(dim), pos, box_length, bin_width, num_bins_gr, r_cut)
+    end
+    return caches
+end
+
+"""
+    evaluate_gr_from_cache(cache, force_over_r, num_bins_gr, r_min, r_cut, bin_width, method; core_strength)
+
+Evaluate g(r) for a single snapshot using precomputed pair data.
+Force loop iterates only over force pairs (1:n_force_pairs).
+Borgis loop iterates over all pairs.
+"""
+function evaluate_gr_from_cache(
+        cache::SnapshotCache{D},
+        force_over_r::Vector{Float64},
+        num_bins_gr::Int,
+        r_min::Float64,
+        r_cut::Float64,
+        bin_width::Float64,
+        method::IntegrationMethod;
+        core_strength::Int=13) where D
+
+    inv_bin_width = 1.0 / bin_width
+
+    # ── Step 1: forces — only force pairs ──
+    total_forces = zeros(SVector{D,Float64}, cache.n_particles)
+
+    @inbounds for idx in 1:cache.n_force_pairs
+        p = cache.pairs[idx]
+
+        f = if p.r < r_min
+            force_magnitude_below_rmin(p.r, r_min, force_over_r, inv_bin_width;
+                                       core_strength=core_strength)
+        else
+            force_magnitude_between_bins(p.r, r_min, r_cut, force_over_r, inv_bin_width)
+        end
+
+        total_forces[p.i] += f * p.rVec
+        total_forces[p.j] -= f * p.rVec
+    end
+
+    # ── Step 2: Borgis contributions — ALL pairs ──
+    borgis = zeros(Float64, num_bins_gr)
+
+    @inbounds for p in cache.pairs
+        bin = floor(Int, p.r * inv_bin_width) + 1
+        bin > num_bins_gr && continue
+
+        Δf = total_forces[p.i] - total_forces[p.j]
+        borgis[bin] += borgis_delta_calculation(Δf, p.rVec, p.r * p.r, p.r)
+    end
+
+    return integrate_borgis_contributions(borgis, method)
+end
+
+"""
+    evaluate_gr_from_caches(caches, force_over_r, num_bins_gr, r_min, r_cut, bin_width, box_length, method; core_strength)
+
+Parallel evaluation and averaging of g(r) across all cached snapshots.
+Replaces `gr_force_from_dir_parallel_binary` inside the iteration loop.
+"""
+function evaluate_gr_from_caches(
+        caches::Vector{<:SnapshotCache},
+        force_over_r::Vector{Float64},
+        num_bins_gr::Int,
+        r_min::Float64, r_cut::Float64,
+        bin_width::Float64,
+        box_length::Float64,
+        method::IntegrationMethod;
+        core_strength::Int=13)
+
+    results = ThreadsX.map(caches) do cache
+        evaluate_gr_from_cache(cache, force_over_r, num_bins_gr,
+                               r_min, r_cut, bin_width, method;
+                               core_strength=core_strength)
+    end
+
+    if method != Both()
+        file_count = length(results)
+        avg = sum(results) ./ file_count
+        var = sum(x -> x .^ 2, results) ./ file_count .- avg .^ 2
+        return avg, var
+    else
+        # Both() mixing logic: blend inner and outer estimators
+        N = caches[1].n_particles
+        prefactor = compute_prefactor(N, box_length, length(caches[1].pairs[1].rVec))
+        inv_prefactor = 1.0 / prefactor
+
+        num_results = length(results)
+        num_bins = length(results[1])
+        grOpt_sum = zeros(Float64, num_bins)
+        half_bins = div(num_bins, 2)
+        temp_cumsum = Vector{Float64}(undef, num_bins)
+
+        for result in results
+            cumsum!(temp_cumsum, result)
+            total_sum = temp_cumsum[end]
+            for i in 1:num_bins
+                val_gr0 = temp_cumsum[i] * inv_prefactor
+                current_rev_cumsum = total_sum - (i > 1 ? temp_cumsum[i-1] : 0)
+                val_grInf = 1.0 - (current_rev_cumsum * inv_prefactor)
+                if i <= half_bins
+                    grOpt_sum[i] += val_gr0
+                else
+                    grOpt_sum[i] += val_grInf
+                end
+            end
+        end
+
+        grOpt_estimator = (grOpt_sum ./ num_results) .* prefactor
+        lambda0 = vcat(zeros(half_bins), ones(num_bins - half_bins))
+        return grOpt_estimator, lambda0
+    end
 end
 
 """
