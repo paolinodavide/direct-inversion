@@ -129,7 +129,7 @@ function main()
     for iteration in 0:max_iter
         gr_old = copy(gr_current)
 
-        # βu_t → gr_t 
+        # βu_t → gr_t
         gr_notNorm, _ = if cache_pairs
             evaluate_gr_from_caches(
                 snapshot_caches, f_current, num_bins_gr,
@@ -162,7 +162,8 @@ function main()
         save_iteration_data(iteration, r_range, gr_current, βu_current, f_current, HomeDir)
 
         # Check convergence
-        error, iteration_diff, potential_increase = compute_convergence_metrics(gr_current, gr_target, gr_old)
+        Delta = shift_gr ? g_min - gr_target[findmin(gr_current)[2]] : 0.0
+        error, iteration_diff, potential_increase = compute_convergence_metrics(gr_current .- Delta, gr_target, gr_old)
 
         @info "Iteration $iteration" error=error iteration_diff=iteration_diff potential_increase=potential_increase g_min=g_min delta=(gr_current[1] - delta_target)
 

@@ -61,7 +61,7 @@ def main():
     )
     args = parser.parse_args()
 
-    rdf_path = os.path.join(args.directory, "outputs/rdfs/")
+    rdf_path = os.path.join(args.directory, "rdfs/")
     r, g_r, var_g = np.loadtxt(os.path.join(rdf_path, 'g_r_h_avg.dat'), unpack=True)
     plt.plot(r, g_r, 'o', label='Histo RDF', markersize=3)
 

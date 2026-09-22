@@ -155,7 +155,7 @@ def main():
 
     # Find all files to process
     inputs_path = os.path.join(args.directory, "inputs/")
-    output_path = os.path.join(args.directory, "outputs/")
+    output_path = args.directory
     os.makedirs(output_path, exist_ok=True)
     os.makedirs(output_path+'/rdfs/', exist_ok=True)
     files = find_lj_config_files(inputs_path+"configs/")
