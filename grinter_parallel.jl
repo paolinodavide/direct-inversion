@@ -58,6 +58,7 @@ function main()
     learning_rate = Float64(params["learning_rate"])
     target_tol = Float64(params["target_precision"])
     iteration_tol = Float64(params["iteration_precision"])
+    cache_pairs = Bool(get(params, "cache_pairs", false))
     method_force_formula = params["method_force_formula"]::String
     method_type = get_method_type(method_force_formula)
     core_strength = Int(params["core_strength"]) #Default is Integer but can be Float. Adjust as needed.
@@ -102,6 +103,18 @@ function main()
     # Handle binary configuration files
     config_dir = ensure_binary_configs(config_dir, wt_file_path, number_config)
 
+    # Precompute pair geometry if cache_pairs is enabled
+    snapshot_caches = if cache_pairs
+        @info "Precomputing pair geometry for all snapshots..."
+        precomp_time = @elapsed caches = precompute_all_snapshots(
+            config_dir, L_box, bin_width, num_bins_gr, r_high
+        )
+        @info "Precomputation done" time=precomp_time n_snapshots=length(caches)
+        caches
+    else
+        @info "Skipping precomputation (retrocompatibility mode)."
+        nothing
+    end
 
     # Precompute constants
     prefactor = compute_prefactor(N_particles, L_box, dimensions)
@@ -117,11 +130,19 @@ function main()
         gr_old = copy(gr_current)
 
         # βu_t → gr_t
-        gr_notNorm, _ = gr_force_from_dir_parallel_binary(
-            config_dir, L_box, bin_width, num_bins_gr,
-            f_current, r_low, r_high, method_type;
-            core_strength=core_strength
-        )
+        gr_notNorm, _ = if cache_pairs
+            evaluate_gr_from_caches(
+                snapshot_caches, f_current, num_bins_gr,
+                r_low, r_high, bin_width, L_box, method_type;
+                core_strength=core_strength
+            )
+        else
+            gr_force_from_dir_parallel_binary(
+                config_dir, L_box, bin_width, num_bins_gr,
+                f_current, r_low, r_high, method_type;
+                core_strength=core_strength
+            )
+        end
         if any(isnan.(gr_notNorm))
             @error "Invalid g(r) values detected. Check force calculations and consider increasing r_low."
             exit(1)
@@ -141,7 +162,8 @@ function main()
         save_iteration_data(iteration, r_range, gr_current, βu_current, f_current, HomeDir)
 
         # Check convergence
-        error, iteration_diff, potential_increase = compute_convergence_metrics(gr_current, gr_target, gr_old)
+        Delta = shift_gr ? g_min - gr_target[findmin(gr_current)[2]] : 0.0
+        error, iteration_diff, potential_increase = compute_convergence_metrics(gr_current .- Delta, gr_target, gr_old)
 
         @info "Iteration $iteration" error=error iteration_diff=iteration_diff potential_increase=potential_increase g_min=g_min delta=(gr_current[1] - delta_target)
 

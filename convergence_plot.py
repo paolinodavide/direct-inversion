@@ -59,6 +59,8 @@ for i, file in enumerate(files):
 
         if file != 'iteration_-1.dat':
             ax_a.plot(radii, gr, color=colors[i], alpha=alpha_val, linewidth=1.4, zorder=z)
+        else:
+            ax_a.plot(radii, gr, color=colors[i], alpha=alpha_val, linewidth=1.4, zorder=z, label='Target', linestyle='--')
 
         ax_b.plot(radii, pot, color=colors[i], alpha=alpha_val, linewidth=lw, zorder=z, label=label_val, linestyle='-' if file != 'iteration_-1.dat' else '--')
     except Exception as e:
@@ -81,7 +83,7 @@ try:
     ax_c.semilogy(it, err, label=r'MSE$(g_t, g_{\text{ref}})$', color=colors[-1], linewidth=2)
     ax_c.semilogy(it, it_diff, label=r'MSE$(g_t, g_{t-1})$', color=colors[0], linewidth=2     )
     ax_c.semilogy(it, pot_increase, label=r'MSE$(\beta u_t, \beta u_{t-1})$', color=colors[num_files//2], linewidth=2)
-    ax_c.legend(handlelength=1, frameon=True)
+    ax_c.legend(handlelength=1, loc='lower left', frameon=True)
     ax_c.set_xlim(0, max(it))
 except:
     ax_c.set_title('Convergence Data Not Found', fontsize=10)
@@ -114,7 +116,8 @@ ax_b.set_ylabel(r'$\beta u_t(r)$')
 # ax_b.set_ylim(-0.75, None)
 
 
-ax_b.legend(loc='upper right')
+ax_a.legend(loc='lower right', frameon=False)
+ax_b.legend(loc='upper right', frameon=False)
 
 # Panel C Labels
 ax_c.set_xlabel(r'Iteration $t$', size='large')
